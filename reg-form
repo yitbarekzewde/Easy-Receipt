@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Account</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(90deg, #0ace14, #cdfa04, #f72702, rgb(90, 172, 101));
+            background-size: 400% 400%;
+            animation: gradientAnimation 15s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-shadow: inset -10px 30px 60px rgba(39, 4, 240, 0.1);
+        }
+
+        @keyframes gradientAnimation {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .left-navigation-arrow {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            cursor: pointer;
+            color: #cdfa06ef;
+        }
+
+        h1 {
+            color: #333;
+            font-weight: bold;
+        }
+
+        label {
+            display: flex;
+            margin-bottom: 2px;
+            color: #0c67cf;
+            font-weight: bold;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: large;
+            margin-top: 10px;
+        }
+
+        .register-form {
+            background: rgba(235, 238, 236, 0.9);
+            padding: 40px;
+            border-radius: 10px;
+            border-start-start-radius: 70px;
+            border-bottom-right-radius: 70px;
+            box-shadow: inset 0 0 100px rgba(7, 31, 243, 0.925), 0 0 20px rgba(241, 3, 3, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        .register-form h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .register-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .register-form input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .register-form button {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(90deg, #0ace14, #cdfa04, #f72702, rgb(30, 248, 40));
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 19px;
+            margin-top: 20px;
+        }
+
+        .register-form button:hover {
+            background: #f71303;
+        }
+
+        .login-link {
+            display: block;
+            margin-top: 15px;
+            color: #0c67cf;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <i class="left-navigation-arrow" onclick="window.location.href='login.html'">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="feather feather-arrow-left">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+    </i>
+
+    <div class="register-form">
+        <h1>Create Account</h1>
+        <form id="registerForm">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="Email Address" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Create Password" required minlength="6">
+
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm Password" required
+                minlength="6">
+
+            <button type="submit">Register</button>
+        </form>
+        <a href="login.html" class="login-link">Already have an account? Login</a>
+    </div>
+
+    <!-- Firebase Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+        // Your Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBYftjbGZSjuRpDdtTpqPRYXrd6y9OF3AI",
+            authDomain: "easy-receipt1.firebaseapp.com",
+            databaseURL: "https://easy-receipt1-default-rtdb.firebaseio.com",
+            projectId: "easy-receipt1",
+            storageBucket: "easy-receipt1.firebasestorage.app",
+            messagingSenderId: "140939199464",
+            appId: "1:140939199464:web:430ba9a47cecf782989a5d",
+            measurementId: "G-17VSKS04HV"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Handle Registration Submission
+        document.getElementById('registerForm').addEventListener('submit', function (event) {
+            event.preventDefault(); // Stop page refresh
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // 1. Check if passwords match
+            if (password !== confirmPassword) {
+                alert("Passwords do not match! Please try again.");
+                return; // Stop the function here
+            }
+
+            // 2. Create the user in Firebase
+            createUserWithEmailAndPassword(auth, email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+
+                    // 3. Send the Verification Link
+                    sendEmailVerification(user)
+                        .then(() => {
+                            alert("Registration successful! We have sent a verification link to your email. Please check your inbox to verify your account before logging in.");
+                            window.location.href = 'login.html'; // Send them to login page
+                        });
+                })
+                .catch((error) => {
+                    const errorCode = error.code;
+                    const errorMessage = error.message;
+
+                    if (errorCode === 'auth/email-already-in-use') {
+                        alert("This email is already registered. Try logging in instead.");
+                    } else if (errorCode === 'auth/weak-password') {
+                        alert("Your password is too weak. Please use at least 6 characters.");
+                    } else {
+                        alert("Registration failed: " + errorMessage);
+                    }
+                    console.error(errorCode, errorMessage);
+                });
+        });
+    </script>
+</body>
+
+</html>
