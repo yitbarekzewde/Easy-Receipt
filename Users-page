@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Easy Receipt</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <style>
+        :root {
+            --primary: #f97316;
+            --dark: #0f172a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f1f5f9;
+            font-family: system-ui, sans-serif;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 15px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .view-panel {
+            display: none;
+            background: white;
+            padding: 18px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        .profile-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        #user-display-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .avatar-wrapper {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .avatar-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .avatar-wrapper img.loaded {
+            display: block;
+        }
+
+        .avatar-wrapper i,
+        .profile-pic-circle i {
+            color: white;
+        }
+
+        .profile-pic-circle {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid var(--primary);
+            background: #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .profile-pic-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+
+        .profile-pic-circle img.loaded {
+            display: block;
+        }
+
+        .profile-pic-circle i {
+            font-size: 48px;
+            color: #cbd5e1;
+        }
+
+        .profile-pic-circle .pic-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border-radius: 50%;
+        }
+
+        .profile-pic-circle:hover .pic-overlay {
+            opacity: 1;
+        }
+
+        .profile-pic-circle .pic-overlay i {
+            font-size: 22px;
+            color: white;
+        }
+
+        #pic-upload-input,
+        #pic-upload-setup {
+            display: none;
+        }
+
+        .pic-hint {
+            font-size: 11px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #000 !important;
+            background: white;
+        }
+
+        .qty-box {
+            width: 65px;
+            font-weight: bold;
+            text-align: center;
+            border: 1px solid var(--primary);
+        }
+
+        .item-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 65px auto;
+            gap: 5px;
+            margin-bottom: 5px;
+            align-items: center;
+        }
+
+        .preview-side {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: sticky;
+            top: 10px;
+        }
+
+        #receipt-box {
+            background: white;
+            padding: 35px 20px;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        button {
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+            color: white;
+        }
+
+        .btn-share { background: #25d366; }
+        .btn-import { background: var(--primary); }
+        .btn-save { background: #06b6d4; }
+
+        .receipt-item-name {
+            text-align: left;
+            padding: 5px 0;
+            white-space: pre-wrap;
+            font-size: 11px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #64748b;
+        }
+
+        .close-modal:hover { color: #ef4444; }
+
+        .profile-info-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .profile-info-text p {
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 2px;
+        }
+
+        .profile-info-text strong {
+            color: #0f172a;
+        }
+
+        .drafts-section {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px dashed #cbd5e1;
+        }
+
+        .draft-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px;
+            background: white;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .draft-actions i {
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .statement-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .statement-table th,
+        .statement-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .statement-table th {
+            background: #f1f5f9;
+            font-weight: bold;
+        }
+
+        .sticky-continer {
+            display: flex;
+            position: sticky;
+            top: 0;
+            background-color: #25d366;
+            height: 60px;
+            width: 100%;
+            border-bottom-right-radius: 20px;
+            border-bottom-left-radius: 20px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            z-index: 100;
+        }
+
+        .menu-btn {
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            position: relative;
+        }
+
+        #dropdown {
+            display: none;
+            position: absolute;
+            top: 110%;
+            left: 0;
+            background: white;
+            list-style: none;
+            padding: 8px;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            min-width: 220px;
+            z-index: 999;
+        }
+
+        #dropdown li {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s;
+        }
+
+        #dropdown li:hover { background: #f1f5f9; }
+
+        .contact-us-btn {
+            background: #3b82f6;
+            margin-bottom: 10px;
+            height: 40px;
+            width: 100%;
+            font-size: 15px;
+            text-align: center;
+            justify-content: center;
+            align-self: center;
+            margin-top: 15px;
+        }
+
+        .mail-card {
+            background: #fff;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-top: 15px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .form-group label {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #475569;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .send-btn {
+            background: var(--primary);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 18px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .auth-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .auth-panel { display: none; }
+        .auth-panel.active { display: block; }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-side {
+                position: static;
+                margin-top: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top">
+        <div class="sticky-continer">
+            <div class="menu-btn" id="menu-btn" onclick="toggleDropdown(event)">
+                <i class="fa fa-bars"></i>
+                <ul id="dropdown">
+                    <li onclick="handleMenuClick('statements')"><i class="fas fa-file-invoice-dollar" style="color:var(--primary);"></i> View Statements</li>
+                    <li onclick="handleMenuClick('drafts')"><i class="fas fa-save" style="color:var(--primary);"></i> Saved Drafts</li>
+                    <li onclick="handleMenuClick('profile')"><i class="fas fa-user-circle" style="color:var(--primary);"></i> Manage Profile</li>
+                    <li onclick="handleMenuClick('downloads')"><i class="fas fa-download" style="color:var(--primary);"></i> Downloaded Receipts</li>
+                    <li onclick="handleMenuClick('savedReceipts')"><i class="fas fa-receipt" style="color:var(--primary);"></i> Saved Receipts</li>
+                </ul>
+            </div>
+
+            <div class="EasyReceipt-title" style="color:white;font-weight:bold;font-size:18px;text-transform:uppercase;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;text-shadow:1px 1px 2px rgba(250,5,5,0.993);">
+                Easy Receipt
+            </div>
+
+            <div class="profile-container" onclick="openProfileModal()">
+                <span id="user-display-name">Guest Cashier</span>
+                <div class="avatar-wrapper" id="nav-avatar-wrapper">
+                    <img id="nav-avatar-img" src="" alt="Profile">
+                    <i class="fas fa-user-circle" id="nav-avatar-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2 style="color:var(--primary);margin-top:10px;text-transform:uppercase;">Stock Importer</h2>
+            <textarea id="bulkData" placeholder="Huletts 1kg&#10;500g&#10;Polony 2.5kg 1" rows="3"></textarea>
+            <button class="btn-import" onclick="importItems()">Process & Add</button>
+            <div id="itemList" style="margin-top:20px;"></div>
+            <button style="background:#cbd5e1;color:#1e293b;font-size:11px;" onclick="addEmpty()">+ Add Row Manually</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;">
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Store Name</label><select id="storeSelect" onchange="handleStoreChange()"></select></div>
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Customer Name</label><input type="text" id="client" placeholder="Enter Customer Name"></div>
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Cash Paid</label><input type="number" id="paid" placeholder="Enter Cash Paid Amount"></div>
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Online Paid</label><input type="number" id="online" placeholder="S2S or Card Paid Amount"></div>
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Discount %</label><input type="number" id="discount" value="0.00" placeholder="Discount %"></div>
+                <div><label style="font-size:18px;color:#1674f7;font-weight:600;">Tax %</label><input type="number" id="tax" value="0.00" placeholder="Tax %"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button class="btn-share" onclick="shareToWhatsApp()"><i class="fab fa-whatsapp"></i> Share to WhatsApp</button>
+                <button style="background:#3b82f6;" onclick="printReceipt()"><i class="fas fa-print"></i> Print Receipt</button>
+                <button style="background:#ef4444;" onclick="handleClearCart()">Clear Cart</button>
+            </div>
+        </div>
+
+        <div class="preview-side">
+            <div id="receipt-box"><div id="receipt-ui"></div></div>
+            <div style="display:flex;gap:10px;width:100%;margin-top:10px;">
+                <button style="background:#3b82f6;margin-top:15px;" onclick="window.downloadReceipt()"><i class="fas fa-download"></i> Download</button>
+                <button style="background:#3b82f6;margin-top:15px;" onclick="saveReceipt()"><i class="fas fa-save"></i> Save Snap</button>
+                <button class="btn-save" onclick="saveCurrentDraft()"><i class="fas fa-save"></i> Save Draft</button>
+            </div>
+            <div class="drafts-section" style="margin-top:15px;width:100%;">
+                <h5 style="margin-bottom:10px;color:#475569;">Saved Drafts / Active Worksheets</h5>
+                <div id="draftsList"></div>
+            </div>
+            <button class="contact-us-btn" onclick="document.getElementById('contactUsEmail').style.display='block';">Contact Us Or Get Support</button>
+            <div id="contactUsEmail" style="display:none;">
+                <div class="mail-card">
+                    <h3 style="color:var(--dark);margin-bottom:10px;"><i class="fas fa-envelope" style="color:var(--primary);"></i> Contact Support</h3>
+                    <p style="font-size:14px;margin-bottom:10px;">Email us at: <a href="mailto:yitbarek537zewde@gmail.com" style="color:var(--primary);">yitbarek537zewde@gmail.com</a></p>
+                    <form id="emailForm">
+                        <div class="form-group"><label>Your email</label><input type="email" id="toEmail" required autocomplete="off"></div>
+                        <div class="form-group"><label>Subject</label><input type="text" id="subject" value="Support Request"></div>
+                        <div class="form-group"><label>Message</label><textarea id="message" rows="3"></textarea></div>
+                        <div class="form-group"><label>Screenshot (Optional)</label><input type="file" id="support-screenshot" accept="image/*"></div>
+                        <button type="submit" id="sendButton" class="send-btn">🚀 Send Email</button>
+                        <button type="button" style="background:#fc1302;margin-top:10px;" onclick="document.getElementById('contactUsEmail').style.display='none';">Close</button>
+                    </form>
+                    <div id="statusArea" style="margin-top:10px;text-align:center;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="authModal" class="modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeAuthModal()">&times;</span>
+            <div id="profile-active-view" style="display:none;">
+                <h3 style="color:var(--dark);margin-bottom:12px;"><i class="fas fa-id-card" style="color:var(--primary);"></i> Cashier Profile</h3>
+                <div class="profile-info-row">
+                    <div class="profile-pic-circle" onclick="document.getElementById('pic-upload-input').click()" title="Click to change photo">
+                        <img id="modal-avatar-img" src="" alt="Profile Photo">
+                        <i class="fas fa-user-circle" id="modal-avatar-icon"></i>
+                        <div class="pic-overlay"><i class="fas fa-camera"></i></div>
+                    </div>
+                    <input type="file" id="pic-upload-input" accept="image/*" onchange="handlePicUpload(event)">
+                    <div class="profile-info-text"><p><strong id="prof-name"></strong></p><p id="prof-email" style="font-size:12px;"></p><span class="pic-hint">Click photo to change</span></div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px;font-weight:bold;color:#475569;display:block;margin-bottom:4px;">Update Display Name</label>
+                    <div style="display:flex;gap:8px;"><input type="text" id="edit-name-input" placeholder="Your name" style="margin:0;flex:1;"><button onclick="saveUpdatedName()" style="width:auto;padding:10px 14px;margin:0;background:var(--primary);font-size:12px;">Save</button></div>
+                </div>
+                <button onclick="logoutUser()" style="background:#ef4444;padding:6px 12px;font-size:11px;width:auto;margin-bottom:20px;">Sign Out</button>
+                <hr style="border:0;border-top:1px solid #e2e8f0;margin-bottom:15px;">
+                <h4 style="color:var(--dark);margin-bottom:10px;"><i class="fas fa-file-invoice-dollar" style="color:var(--primary);"></i> Account Statement & Order History</h4>
+                <div style="overflow-x:auto;"><table class="statement-table"><thead><tr><th>Date/Time</th><th>Client Name</th><th>Item Details</th><th>Total</th></tr></thead><tbody id="statement-rows"></tbody></table></div>
+            </div>
+
+            <div id="profile-setup-view">
+                <h3 style="margin-bottom:15px;color:var(--dark);">Account Setup</h3>
+                <div class="auth-tabs">
+                    <div class="auth-tab active" onclick="switchTab('google')"><i class="fab fa-google"></i> Sign in with Google</div>
+                    <div class="auth-tab" onclick="switchTab('manual')"><i class="fas fa-user"></i> Manual Setup</div>
+                </div>
+                <div class="auth-panel active" id="tab-google">
+                    <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Sign in with your Google account to sync your receipts and profile photo automatically.</p>
+                    <div id="g_id_onload" data-client_id="140939199464-qebi1pvbll1q8e4e861pckst38t8e7n3.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+                    <div class="g_id_signin" data-type="standard" style="margin-bottom:15px;"></div>
+                </div>
+                <div class="auth-panel" id="tab-manual">
+                    <p style="font-size:13px;color:#64748b;margin-bottom:14px;">Set up your profile manually and optionally upload a profile photo.</p>
+                    <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:16px;">
+                        <div class="profile-pic-circle" onclick="document.getElementById('pic-upload-setup').click()" title="Click to add photo">
+                            <img id="setup-avatar-img" src="" alt="Profile Photo">
+                            <i class="fas fa-user-circle" id="setup-avatar-icon"></i>
+                            <div class="pic-overlay"><i class="fas fa-camera"></i></div>
+                        </div>
+                        <input type="file" id="pic-upload-setup" accept="image/*" style="display:none;" onchange="handleSetupPicUpload(event)">
+                        <span class="pic-hint">Click to add a profile photo</span>
+                    </div>
+                    <form id="profileForm" onsubmit="saveManualProfile(event)">
+                        <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Cashier / Owner Name</label>
+                        <input type="text" id="regName" placeholder="e.g. Yitbarek Zewde" required>
+                        <label style="font-size:12px;font-weight:bold;display:block;margin-bottom:4px;">Shop Contact Email</label>
+                        <input type="email" id="regEmail" placeholder="name@example.com" required>
+                        <button type="submit" style="background:var(--primary);">Save Profile Details</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewsModal" class="modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeViewsModal()">&times;</span>
+            <div id="view-statements" class="view-panel"><h3 style="margin-bottom:10px;color:var(--dark);">Statements</h3><div id="statementView"></div></div>
+            <div id="view-drafts" class="view-panel"><h3 style="margin-bottom:10px;color:var(--dark);">Saved Drafts</h3><div id="draftView"></div></div>
+            <div id="view-profile" class="view-panel"><h3 style="margin-bottom:10px;color:var(--dark);">Profile Details</h3><div id="profileView"></div></div>
+            <div id="view-downloads" class="view-panel"><h3 style="margin-bottom:10px;color:var(--dark);">Downloaded Receipts</h3><div id="downloadView"></div></div>
+            <div id="view-savedReceipts" class="view-panel"><h3 style="margin-bottom:10px;color:var(--dark);">Saved Receipts</h3><div id="savedReceiptView"></div></div>
+        </div>
+    </div>
+
+    <div id="receiptImageModal" class="modal" style="z-index:1001;">
+        <div class="modal-content" onclick="event.stopPropagation()" style="text-align:center;background:#f8fafc;max-width:450px;">
+            <span class="close-modal" onclick="document.getElementById('receiptImageModal').style.display='none'">&times;</span>
+            <h4 style="margin-bottom:15px;color:var(--dark);">Saved Receipt Snapshot</h4>
+            <img id="receiptImageView" src="" style="max-width:100%;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+            <div style="display:flex;gap:10px;margin-top:15px;">
+                <button onclick="downloadSavedImage()" style="background:#25d366;"><i class="fas fa-download"></i> Download Image</button>
+                <button onclick="document.getElementById('receiptImageModal').style.display='none'" style="background:#ef4444;">Close View</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SERVICE_ID = "service_2kca2tm", TEMPLATE_ID = "template_bk6mitp", PUBLIC_KEY = "4SOcrHZJ1yHxQiXjQ";
+        let cart = [], currentUser = null, savedStores = [], pendingSetupPic = null, successTimer = null;
+        const CLOUD_DB_URL = "https://script.google.com/macros/s/AKfycbw1K6bkpSjBnS8dGvc9aE5v69V-pU0KJaLujN-bsS1LIf39oCzOLrnAwi0tQ8KmMxUOgg/exec";
+        if (window.emailjs) emailjs.init(PUBLIC_KEY);
+
+        window.onload = function () { loadUserData(); loadDrafts(); initStoreManager(); cart = [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }]; render(); document.querySelectorAll('input[type=text], input[type=number]').forEach(el => el.oninput = updateUI); document.getElementById('emailForm').addEventListener('submit', handleEmailSubmit); document.getElementById('viewsModal').addEventListener('click', closeViewsModal); document.getElementById('receiptImageModal').addEventListener('click', function () { this.style.display = 'none'; }); };
+        function closeViewsModal() { document.getElementById('viewsModal').style.display = 'none'; }
+        function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; }
+        function parseJwt(token) { try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return {}; } }
+        function getStoredProfile() { return JSON.parse(localStorage.getItem('p3_user_profile') || 'null'); }
+        function saveProfile(profileObj) { currentUser = profileObj; localStorage.setItem('p3_user_profile', JSON.stringify(profileObj)); document.getElementById('user-display-name').innerText = profileObj.name || 'Cashier'; applyAvatarEverywhere(profileObj.picture || null); }
+        function loadUserData() { const saved = getStoredProfile(); if (saved && saved.name && saved.email) saveProfile(saved); else { currentUser = null; document.getElementById('user-display-name').innerText = "Guest Cashier"; applyAvatarEverywhere(null); } }
+        function applyAvatarEverywhere(src) { setAvatar('nav-avatar-img', 'nav-avatar-icon', src); setAvatar('modal-avatar-img', 'modal-avatar-icon', src); setAvatar('setup-avatar-img', 'setup-avatar-icon', src); }
+        function setAvatar(imgId, iconId, src) { const img = document.getElementById(imgId), icon = document.getElementById(iconId); if (!img || !icon) return; if (src) { img.src = src; img.classList.add('loaded'); icon.style.display = 'none'; } else { img.src = ''; img.classList.remove('loaded'); icon.style.display = ''; } }
+        function handleSetupPicUpload(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = ev => { pendingSetupPic = ev.target.result; setAvatar('setup-avatar-img', 'setup-avatar-icon', pendingSetupPic); }; reader.readAsDataURL(file); }
+        function handlePicUpload(e) { const file = e.target.files[0]; if (!file || !currentUser) return; const reader = new FileReader(); reader.onload = ev => { currentUser.picture = ev.target.result; localStorage.setItem('p3_user_profile', JSON.stringify(currentUser)); applyAvatarEverywhere(currentUser.picture); }; reader.readAsDataURL(file); }
+        function openProfileModal() { openView('profile'); }
+        function openView(type) { const modal = document.getElementById('viewsModal'); document.querySelectorAll('#viewsModal .view-panel').forEach(v => v.classList.remove('active')); document.getElementById('view-' + type).classList.add('active'); if (type === 'profile') { const saved = getStoredProfile(); const profileView = document.getElementById('profileView'); if (saved && saved.name && saved.email) { profileView.innerHTML = `<div style="font-size:13px;line-height:1.7;color:#334155;"><p><b>Name:</b> ${saved.name}</p><p><b>Email:</b> ${saved.email}</p><p><b>Provider:</b> ${saved.provider || 'manual'}</p></div>`; } else { profileView.innerHTML = `<p style="font-size:13px;color:#64748b;">No profile saved yet.</p>`; } } if (type === 'statements') buildStatementRows(); if (type === 'drafts') loadDrafts(); if (type === 'downloads') renderDownloadedReceipts(); if (type === 'savedReceipts') renderSavedReceipts(); modal.style.display = 'flex'; }
+        function switchTab(tab) { document.querySelectorAll('.auth-tab').forEach((el, i) => el.classList.toggle('active', (i === 0 && tab === 'google') || (i === 1 && tab === 'manual'))); document.getElementById('tab-google').classList.toggle('active', tab === 'google'); document.getElementById('tab-manual').classList.toggle('active', tab === 'manual'); }
+        function handleMenuClick(actionType) { document.getElementById('dropdown').style.display = 'none'; openView(actionType); }
+        function loadDrafts() { const container = document.getElementById('draftsList'), view = document.getElementById('draftView'), drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'); const html = drafts.length ? drafts.map(d => `<div class="draft-item"><span><b>${d.client || 'Guest'}</b> (${d.timestamp})</span><div class="draft-actions"><i class="fas fa-folder-open" style="color:var(--primary);" onclick="restoreDraft(${d.id})" title="Load"></i><i class="fas fa-trash" style="color:#ef4444;" onclick="deleteDraft(${d.id})" title="Delete"></i></div></div>`).join('') : '<p style="font-size:11px;color:#94a3b8;">No drafts available.</p>'; if (container) container.innerHTML = html; if (view) view.innerHTML = html; }
+        function buildStatementRows() { const tbody = document.getElementById('statement-rows'); if (!tbody) return; const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'), snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]'); const rows = [...drafts.map(x => ({ ...x, type: 'draft' })), ...snaps.map(x => ({ ...x, type: 'snap' }))].sort((a, b) => (b.id || 0) - (a.id || 0)); if (!rows.length) { tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#94a3b8;">No statement entries found.</td></tr>`; return; } tbody.innerHTML = rows.map(d => { let itemsReport = '', totalVal = 0; if (d.cart && Array.isArray(d.cart)) { itemsReport = d.cart.map(i => `• ${i.name} (x${i.qty}) @ R${parseFloat(i.price || 0).toFixed(2)}`).join('<br>'); const sub = d.cart.reduce((s, i) => s + (parseFloat(i.price || 0) * parseInt(i.qty || 1)), 0); const discAmt = sub * (parseFloat(d.discount || 0) / 100); const afterDisc = sub - discAmt; totalVal = afterDisc + afterDisc * (parseFloat(d.tax || 0) / 100); } else if (d.image) { itemsReport = `<button onclick="viewSavedReceiptImage('${d.image.replace(/'/g, "\\'")}')" style="background:#0f172a;padding:6px 10px;font-size:11px;margin:0;border-radius:5px;"><i class="fas fa-image"></i> View Saved Snapshot</button>`; totalVal = parseFloat(d.paid || 0); } return `<tr><td style="white-space:nowrap;">${d.timestamp || ''}</td><td><b>${d.client || 'N/A'}</b><br><small style="color:#64748b;">Store: ${d.store || 'N/A'}</small></td><td style="color:#334155;font-family:monospace;font-size:11px;">${itemsReport}</td><td style="text-align:right;font-weight:bold;color:var(--dark);">R ${totalVal.toFixed(2)}</td></tr>`; }).join(''); }
+        function renderDownloadedReceipts() { const view = document.getElementById('downloadView'), snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]'); view.innerHTML = snaps.length ? snaps.map(s => `<div class="draft-item"><span><b>${s.client || 'Guest'}</b> (${s.timestamp || ''})</span><div class="draft-actions"><i class="fas fa-image" style="color:var(--primary);" onclick="viewSavedReceiptImage('${s.image.replace(/'/g, "\\'")}')" title="View"></i><i class="fas fa-download" style="color:#2563eb;" onclick="downloadBase64Image('${s.image.replace(/'/g, "\\'")}', 'receipt.png')" title="Download"></i></div></div>`).join('') : '<p style="font-size:11px;color:#94a3b8;">No downloaded receipts found.</p>'; }
+        function renderSavedReceipts() { const view = document.getElementById('savedReceiptView'), snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]'); view.innerHTML = snaps.length ? snaps.map(s => `<div class="draft-item"><span><b>${s.client || 'Guest'}</b> (${s.store || 'Store'})</span><div class="draft-actions"><i class="fas fa-image" style="color:var(--primary);" onclick="viewSavedReceiptImage('${s.image.replace(/'/g, "\\'")}')" title="View"></i></div></div>`).join('') : '<p style="font-size:11px;color:#94a3b8;">No saved receipts found.</p>'; }
+        function viewSavedReceiptImage(base64Data) { document.getElementById('receiptImageView').src = base64Data; document.getElementById('receiptImageModal').style.display = 'flex'; }
+        function downloadBase64Image(src, filename) { const a = document.createElement('a'); a.href = src; a.download = filename; a.click(); }
+        function downloadSavedImage() { downloadBase64Image(document.getElementById('receiptImageView').src, 'Saved_Receipt_Snapshot.png'); }
+        function initStoreManager() { const defaults = ["Tanala Mini Shop", "Easy Receipt", "My Supermarket"]; savedStores = JSON.parse(localStorage.getItem('p3_saved_stores') || JSON.stringify(defaults)); renderStoreSelect(); }
+        function renderStoreSelect() { const select = document.getElementById('storeSelect'); select.innerHTML = savedStores.map(s => `<option value="${s}">${s}</option>`).join('') + `<option value="ADD_NEW" style="color:#2563eb;font-weight:bold;">➕ Add New Store...</option>`; updateUI(); }
+        function handleStoreChange() { const select = document.getElementById('storeSelect'); if (select.value === "ADD_NEW") { const name = prompt("Enter the name of your new store:"); if (name && name.trim()) { const clean = name.trim(); if (!savedStores.includes(clean)) { savedStores.push(clean); localStorage.setItem('p3_saved_stores', JSON.stringify(savedStores)); } renderStoreSelect(); select.value = clean; } else { renderStoreSelect(); } } updateUI(); }
+        function importItems() { const lines = document.getElementById('bulkData').value.split('\n'); lines.forEach(line => { if (!line.trim()) return; const clean = line.trim(); let parts = clean.split(/\s+/), qty = 1; if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) qty = parseInt(parts.pop()); cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: parts.join(' '), price: 0, qty }); }); document.getElementById('bulkData').value = ''; render(); }
+        function render() { const list = document.getElementById('itemList'); list.innerHTML = cart.map(i => `<div class="item-row"><input type="text" value="${i.name}" onchange="upd(${i.id},'name',this.value)"><input type="number" placeholder="Price" value="${i.price}" oninput="upd(${i.id},'price',this.value)"><input type="number" class="qty-box" value="${i.qty}" oninput="upd(${i.id},'qty',this.value)"><i class="fas fa-trash-alt" style="color:#ef4444;cursor:pointer;" onclick="del(${i.id})"></i></div>`).join(''); updateUI(); }
+        function upd(id, f, v) { let item = cart.find(x => x.id === id); if (!item) return; if (f === 'price') item[f] = v === '' ? 0 : parseFloat(v); else if (f === 'qty') item[f] = v === '' ? 1 : parseInt(v); else item[f] = v; updateUI(); }
+        function del(id) { cart = cart.filter(x => x.id !== id); render(); }
+        function addEmpty() { cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: "Item", price: 0, qty: 1 }); render(); }
+        function handleClearCart() { if (confirm("Clear all items?")) { cart = []; render(); } }
+        function updateUI() { const receiptBox = document.getElementById('receipt-box'); if (!receiptBox) return; let sub = cart.reduce((s, i) => s + (parseFloat(i.price || 0) * parseInt(i.qty || 1)), 0), discountPct = parseFloat(document.getElementById('discount').value || 0) / 100, discountAmt = sub * discountPct, subAfterDiscount = sub - discountAmt, txVal = subAfterDiscount * (parseFloat(document.getElementById('tax').value || 0) / 100), total = subAfterDiscount + txVal, pd = parseFloat(document.getElementById('paid').value) || 0, onlinePaid = parseFloat(document.getElementById('online').value) || 0, totalPaid = pd + onlinePaid, change = totalPaid - total, storeName = document.getElementById('storeSelect').value || "My Store"; document.getElementById('receipt-ui').innerHTML = `<div style="text-align:center;color:#000;font-family:'Courier New',monospace;"><h1 style="color:var(--primary);text-transform:uppercase;margin-bottom:5px;font-size:22px;">${storeName}</h1><p style="font-size:10px;">${new Date().toLocaleString()}</p><div style="border-top:1px dashed #000;margin:10px 0;"></div><p style="text-align:left;font-size:11px;"><b>CLIENT:</b> ${document.getElementById('client').value || '-'}</p><table style="width:100%;margin:15px 0;font-size:10px;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid #000;font-weight:bold;"><th style="text-align:left;padding-bottom:5px;">ORDER ITEMS</th><th style="text-align:center;padding-bottom:5px;">QTY</th><th style="text-align:right;padding-bottom:5px;">EACH</th><th style="text-align:right;padding-bottom:5px;">TOTAL</th></tr></thead><tbody>${cart.map(i => { let each = parseFloat(i.price || 0), itotal = each * parseInt(i.qty || 1); return `<tr><td class="receipt-item-name">${i.name}</td><td style="text-align:center;">${i.qty}</td><td style="text-align:right;">${each.toFixed(2)}</td><td style="text-align:right;">${itotal.toFixed(2)}</td></tr>`; }).join('')}</tbody></table><div style="border-top:1px solid #000;padding-top:8px;"></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Subtotal</span><span>R ${sub.toFixed(2)}</span></div>${discountAmt > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:#dc2626;"><span>Discount (${document.getElementById('discount').value}%)</span><span>-R ${discountAmt.toFixed(2)}</span></div>` : ''}${txVal > 0 ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>Tax (${document.getElementById('tax').value}%)</span><span>R ${txVal.toFixed(2)}</span></div>` : ''}<div style="display:flex;justify-content:space-between;font-weight:bold;font-size:18px;margin-top:6px;border-top:1px dashed #000;padding-top:6px;"><span>TOTAL</span><span>R ${total.toFixed(2)}</span></div>${totalPaid > 0 ? `<div style="margin-top:8px;font-size:14px;">${pd > 0 ? `<div style="display:flex;justify-content:space-between;color:#16a34a;font-weight:600;"><span>Cash Paid</span><span>R ${pd.toFixed(2)}</span></div>` : ''}${onlinePaid > 0 ? `<div style="display:flex;justify-content:space-between;color:#2563eb;font-weight:600;"><span>Card/S2S Paid</span><span>R ${onlinePaid.toFixed(2)}</span></div>` : ''}<div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px;font-weight:bold;"><span>CHANGE</span><span style="color:${change >= 0 ? '#16a34a' : '#ef4444'};">R ${change.toFixed(2)}</span></div>${change < 0 ? `<div style="color:#ef4444;font-weight:600;font-size:13px;margin-top:4px;">AMOUNT DUE: R ${Math.abs(change).toFixed(2)}</div>` : ''}</div>` : ''}<div style="margin-top:35px;display:flex;flex-direction:column;align-items:center;"><div id="qr-place"></div><p style="font-size:8px;margin-top:10px;color:#666;">SCAN TO VISIT OUR WEBSITE</p><p style="font-size:8px;margin-top:6px;color:#008000;">This receipt is prepared by <strong>${currentUser ? currentUser.name : "Easy Receipt"}</strong></p></div></div>`; const qr = new QRious({ element: document.createElement('canvas'), value: 'https://easy-receipt-yitbarek.netlify.app/', size: 90 }); const qrContainer = document.getElementById('qr-place'); if (qrContainer) { qrContainer.innerHTML = ''; qrContainer.appendChild(qr.image); } }
+        function printReceipt() { const box = document.getElementById('receipt-box'); if (!box) return; const clone = box.cloneNode(true); const canvas = document.querySelector('#qr-place canvas'); if (canvas) { const img = document.createElement('img'); img.src = canvas.toDataURL('image/png'); img.style.cssText = 'width:90px;height:90px;'; const qrPlace = clone.querySelector('#qr-place'); if (qrPlace) { qrPlace.innerHTML = ''; qrPlace.appendChild(img); } } const pw = window.open('', '_blank'); pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt</title><style>body { margin: 0; padding: 20px; font-family: 'Courier New', monospace; background: white; }.receipt-item-name { text-align: left; padding: 5px 0; white-space: pre-wrap; font-size: 11px; }table { width: 100%; border-collapse: collapse; }@media print { body { padding: 0; } }</style></head><body>${clone.innerHTML}</body></html>`); pw.document.close(); pw.focus(); setTimeout(() => pw.print(), 500); }
+        async function generateBlob() { const canvas = await html2canvas(document.getElementById('receipt-box'), { scale: 3, backgroundColor: "#ffffff" }); return new Promise(r => canvas.toBlob(r, 'image/png')); }
+        async function shareToWhatsApp() { try { const blob = await generateBlob(); const file = new File([blob], 'receipt.png', { type: 'image/png' }); if (navigator.share) await navigator.share({ files: [file], title: 'My Receipt' }); else alert("Sharing not supported on this browser."); } catch (e) { alert("Sharing failed."); } }
+        window.downloadReceipt = async function () { try { const blob = await generateBlob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'receipt.png'; a.click(); } catch (e) { alert("Download failed."); } };
+        function saveReceipt() { if (cart.length === 0) return alert("Cart is empty!"); generateBlob().then(blob => { const reader = new FileReader(); reader.onloadend = function () { let snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]'); snaps.push({ id: Date.now(), timestamp: new Date().toLocaleString(), store: document.getElementById('storeSelect').value, client: document.getElementById('client').value, paid: document.getElementById('paid').value, image: reader.result }); localStorage.setItem('p3_pos_snapshots', JSON.stringify(snaps)); buildStatementRows(); renderDownloadedReceipts(); renderSavedReceipts(); alert("Receipt Snap Saved!"); }; reader.readAsDataURL(blob); }); }
+        async function fetchCloudData(email) { try { const res = await fetch(`${CLOUD_DB_URL}?email=${encodeURIComponent(email)}`); const data = await res.json(); if (data.drafts && data.drafts.length > 0) { localStorage.setItem('p3_pos_drafts', JSON.stringify(data.drafts)); loadDrafts(); buildStatementRows(); } } catch (err) { console.error("Cloud fetch failed:", err); } }
+        async function pushToCloud() { if (!currentUser || !currentUser.email) return; const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'); try { await fetch(CLOUD_DB_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: currentUser.email, drafts }) }); } catch (err) { console.error("Cloud push failed:", err); } }
+        function saveCurrentDraft() { if (cart.length === 0) return alert("Cart is empty!"); let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'); drafts.push({ id: Date.now(), timestamp: new Date().toLocaleString(), store: document.getElementById('storeSelect').value, client: document.getElementById('client').value, tax: document.getElementById('tax').value, discount: document.getElementById('discount').value, paid: document.getElementById('paid').value, online: document.getElementById('online').value, cart: cart }); localStorage.setItem('p3_pos_drafts', JSON.stringify(drafts)); loadDrafts(); pushToCloud(); alert("Draft successfully preserved and synced!"); }
+        function restoreDraft(id) { let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'); let target = drafts.find(x => x.id === id); if (!target) return; document.getElementById('storeSelect').value = target.store || savedStores[0]; document.getElementById('client').value = target.client || ''; document.getElementById('tax').value = target.tax || '0.00'; document.getElementById('discount').value = target.discount || '0.00'; document.getElementById('paid').value = target.paid || ''; document.getElementById('online').value = target.online || ''; if (target.cart) cart = target.cart; render(); }
+        function deleteDraft(id) { let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]'); drafts = drafts.filter(x => x.id !== id); localStorage.setItem('p3_pos_drafts', JSON.stringify(drafts)); loadDrafts(); }
+        async function handleEmailSubmit(e) { e.preventDefault(); const btn = document.getElementById('sendButton'), status = document.getElementById('statusArea'); btn.innerHTML = "Sending..."; btn.disabled = true; status.innerHTML = ""; try { const screenshotInput = document.getElementById('support-screenshot'); let screenshotBase64 = ""; if (screenshotInput.files && screenshotInput.files[0]) screenshotBase64 = await fileToBase64(screenshotInput.files[0]); await emailjs.send(SERVICE_ID, TEMPLATE_ID, { from_name: currentUser?.name || 'Guest Cashier', from_email: document.getElementById('toEmail').value, subject: document.getElementById('subject').value, message: document.getElementById('message').value, user_email: document.getElementById('toEmail').value, screenshot: screenshotBase64, store_name: document.getElementById('storeSelect')?.value || '' }); status.innerHTML = "<span style='color:green;'>✅ Email sent successfully!</span>"; clearTimeout(successTimer); successTimer = setTimeout(() => status.innerHTML = "", 3000); document.getElementById('emailForm').reset(); } catch (err) { console.error(err); status.innerHTML = "<span style='color:#ef4444;'>❌ Failed to send email.</span>"; } finally { btn.innerHTML = "🚀 Send Email"; btn.disabled = false; } }
+        function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+        function saveUpdatedName() { const newName = document.getElementById('edit-name-input').value.trim(); if (!newName || !currentUser) return; currentUser.name = newName; localStorage.setItem('p3_user_profile', JSON.stringify(currentUser)); document.getElementById('user-display-name').innerText = newName; document.getElementById('prof-name').innerText = newName; alert("Name updated!"); }
+        function logoutUser() { if (!confirm("Are you sure you want to sign out?")) return; localStorage.removeItem('p3_user_profile'); currentUser = null; document.getElementById('user-display-name').innerText = "Guest Cashier"; applyAvatarEverywhere(null); document.getElementById('viewsModal').style.display = 'none'; document.getElementById('profile-setup-view').style.display = 'block'; document.getElementById('profile-active-view').style.display = 'none'; updateUI(); }
+        function handleCredentialResponse(response) { const payload = parseJwt(response.credential); if (!payload.email) return alert('Google sign-in failed.'); saveProfile({ name: payload.name || "Google User", email: payload.email, picture: payload.picture || null, provider: 'google' }); fetchCloudData(payload.email); openView('profile'); updateUI(); }
+        function saveManualProfile(e) { e.preventDefault(); const name = document.getElementById('regName').value.trim(), email = document.getElementById('regEmail').value.trim(); if (!name || !email) return alert('Please fill in both name and email.'); saveProfile({ name, email, picture: pendingSetupPic || null, provider: 'manual' }); pendingSetupPic = null; document.getElementById('profileForm').reset(); openView('profile'); updateUI(); }
+        function openSnapshotsModal() { openView('savedReceipts'); }
+        function handleClearCart() { if (confirm("Clear all items?")) { cart = []; render(); } }
+        function addEmpty() { cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: "Item", price: 0, qty: 1 }); render(); }
+
+        function toggleDropdown(e) {
+            e.stopPropagation();
+            const dd = document.getElementById('dropdown');
+            dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+        }
+
+        document.addEventListener('click', function (e) {
+            const menuBtn = document.getElementById('menu-btn');
+            const dropdown = document.getElementById('dropdown');
+            if (menuBtn && dropdown && !menuBtn.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        window.onload = function () { loadUserData(); initStoreManager(); loadDrafts(); cart = [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }]; render(); document.querySelectorAll('input[type=text], input[type=number]').forEach(el => el.oninput = updateUI); document.getElementById('emailForm').addEventListener('submit', handleEmailSubmit); document.getElementById('viewsModal').addEventListener('click', closeViewsModal); document.getElementById('receiptImageModal').addEventListener('click', function () { this.style.display = 'none'; }); };
+    </script>
+</body>
+</html>
