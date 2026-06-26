@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Easy Receipt</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Moved inline styles to CSS (kept here due to single-file edit constraint) */
+        .bg-black { background-color: black; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="module" src="firebase-config.js"></script>
+</head>
+<body>
+    <div class="top">
+        <div class="sticky-continer">
+            <div class="menu-btn" id="menu-btn" onclick="toggleDropdown(event)">
+                <i class="fa fa-bars"></i>
+                <ul id="dropdown">
+                    <li onclick="handleMenuClick('statements')"><i class="fas fa-file-invoice-dollar icon-primary"></i> View Statements</li>
+                    <li onclick="handleMenuClick('drafts')"><i class="fas fa-save icon-primary"></i> Saved Drafts</li>
+                    <li onclick="handleMenuClick('profile')"><i class="fas fa-user-circle icon-primary"></i> Manage Profile</li>
+                    <li onclick="window.location.href='register.html'"><i class="fas fa-user-plus icon-primary"></i> Register Account</li>
+                    <li onclick="window.location.href='dashboard.html'"><i class="fas fa-gauge-high icon-primary"></i> Customer Dashboard</li>
+                    <li onclick="handleMenuClick('customers')"><i class="fas fa-users icon-primary"></i> Manage Customers</li>
+                    <li onclick="handleMenuClick('downloads')"><i class="fas fa-download icon-primary"></i> Downloaded Receipts</li>
+                    <li onclick="handleMenuClick('savedReceipts')"><i class="fas fa-receipt icon-primary"></i> Saved Receipts</li>
+                </ul>
+            </div>
+            <div class="easy-receipt-title">Easy Receipt</div>
+            <div class="profile-container" onclick="openProfileModal()">
+                <span id="user-display-name">Guest Cashier</span>
+                <div class="avatar-wrapper" id="nav-avatar-wrapper">
+                    <img id="nav-avatar-img" src="" alt="Profile">
+                    <i class="fas fa-user-circle" id="nav-avatar-icon"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2 class="section-heading">Stock Importer</h2>
+            <textarea id="bulkData" placeholder="Huletts 1kg&#10;500g&#10;Polony 2.5kg 1" rows="3"></textarea>
+            <button class="btn-import" onclick="importItems()">Process & Add</button>
+            <div id="itemList" class="mt-20"></div>
+            <button class="btn-secondary" onclick="addEmpty()">+ Add Row Manually</button>
+
+            <div class="form-grid mt-20">
+                <div>
+                    <label class="section-label" for="storeSelect">Store Name</label>
+                    <select id="storeSelect" onchange="handleStoreChange()"></select>
+                </div>
+                <div>
+                    <label class="section-label">Customer Name</label>
+                    <div class="form-group-inline">
+                        <input type="text" id="client" list="customerSuggestions" placeholder="Enter Customer Name" class="flex-grow">
+                        <button type="button" onclick="addCustomerFromInput()" title="Save to customer list" class="inline-btn-square"><i class="fas fa-user-plus"></i></button>
+                    </div>
+                    <datalist id="customerSuggestions"></datalist>
+                </div>
+                <div>
+                    <label class="section-label">Cash Paid</label>
+                    <input type="number" id="paid" placeholder="Enter Cash Paid Amount">
+                </div>
+                <div>
+                    <label class="section-label">Online Paid</label>
+                    <input type="number" id="online" placeholder="S2S or Card Paid Amount">
+                </div>
+                <div>
+                    <label class="section-label">Discount %</label>
+                    <input type="number" id="discount" value="0.00" placeholder="Discount %">
+                </div>
+                <div>
+                    <label class="section-label">Tax %</label>
+                    <input type="number" id="tax" value="0.00" placeholder="Tax %">
+                </div>
+            </div>
+
+            <div class="flex-gap-10 mt-20">
+                <button class="btn-share"><i class="fab fa-whatsapp"></i> Share to WhatsApp</button>
+                <button class="btn-primary" onclick="printReceipt()"><i class="fas fa-print"></i> Print Receipt</button>
+                <button class="btn-danger" onclick="handleClearCart()">Clear Cart</button>
+            </div>
+        </div>
+
+        <div class="preview-side">
+            <div id="receipt-box"><div id="receipt-ui"></div></div>
+
+            <div class="flex-gap-10 mt-10">
+                <button class="btn-primary" onclick="window.downloadReceipt()"><i class="fas fa-download"></i> Download</button>
+                <button class="btn-primary" onclick="saveReceipt()"><i class="fas fa-save"></i> Save Snap</button>
+                <button class="btn-save" onclick="saveCurrentDraft()"><i class="fas fa-save"></i> Save Draft</button>
+            </div>
+
+            <div class="drafts-section mt-20 full-width">
+                <h5 class="section-subheading">Saved Drafts / Active Worksheets</h5>
+                <div id="draftsList"></div>
+            </div>
+
+            <button class="contact-us-btn" onclick="document.getElementById('contactUsEmail').classList.remove('hidden');">Contact Us Or Get Support</button>
+
+            <div id="contactUsEmail" class="hidden">
+                <div class="mail-card">
+                    <h3 class="modal-heading"><i class="fas fa-envelope action-icon-primary"></i> Contact Support</h3>
+                    <p class="paragraph-small">Email us at: <a href="mailto:yitbarek537zewde@gmail.com" class="link-primary">yitbarek537zewde@gmail.com</a></p>
+                    <form id="emailForm">
+                        <div class="form-group"><label class="small-label" for="toEmail">Your email</label><input type="email" id="toEmail" name="toEmail" required autocomplete="off" placeholder="you@example.com" title="Your email address"></div>
+                        <div class="form-group"><label class="small-label" for="subject">Subject</label><input type="text" id="subject" name="subject" value="Support Request" placeholder="Email subject" title="Email subject"></div>
+                        <div class="form-group"><label class="small-label" for="message">Message</label><textarea id="message" name="message" rows="3" placeholder="Describe your issue or question" title="Message body"></textarea></div>
+                        <div class="form-group"><label class="small-label" for="support-screenshot">Screenshot (Optional)</label><input type="file" id="support-screenshot" name="support-screenshot" accept="image/*" title="Attach a screenshot (optional)"></div>
+                        <button type="submit" id="sendButton" class="send-btn">🚀 Send Email</button>
+                        <button type="button" class="btn-danger" onclick="document.getElementById('contactUsEmail').classList.add('hidden');">Close</button>
+                    </form>
+                    <div id="statusArea" class="status-message"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeAuthModal()">&times;</span>
+            <div id="profile-active-view" class="hidden">
+                <h3 class="modal-heading"><i class="fas fa-id-card action-icon-primary"></i> Cashier Profile</h3>
+                <div class="profile-info-row">
+                    <div class="profile-pic-circle" onclick="document.getElementById('pic-upload-input').click()" title="Click to change photo">
+                        <img id="modal-avatar-img" src="" alt="Profile Photo">
+                        <i class="fas fa-user-circle" id="modal-avatar-icon"></i>
+                        <div class="pic-overlay"><i class="fas fa-camera"></i></div>
+                    </div>
+                    <input type="file" id="pic-upload-input" accept="image/*" onchange="handlePicUpload(event)" title="Upload profile photo" placeholder="Upload photo" aria-label="Upload profile photo">
+                    <div class="profile-info-text"><p><strong id="prof-name"></strong></p><p id="prof-email" class="text-muted"></p><span class="pic-hint">Click photo to change</span></div>
+                </div>
+
+                <div class="profile-update-row">
+                    <label class="small-label">Update Display Name</label>
+                    <div class="profile-form-row">
+                        <input type="text" id="edit-name-input" placeholder="Your name">
+                        <button onclick="saveUpdatedName()" class="button-save-profile">Save</button>
+                    </div>
+                </div>
+
+                <div class="flex-gap-10">
+                    <button onclick="logoutUser()" class="btn-danger btn-danger-sm">Sign Out</button>
+                    <button onclick="window.location.href='register.html'" class="btn-primary btn-danger-sm"><i class="fas fa-user-plus"></i> Register Account</button>
+                </div>
+                <hr class="section-divider">
+                <h4 class="section-subheading"><i class="fas fa-file-invoice-dollar action-icon-primary"></i> Account Statement & Order History</h4>
+                <div class="scrollable-x"><table class="statement-table"><thead><tr><th>Date/Time</th><th>Client Name</th><th>Item Details</th><th>Total</th></tr></thead><tbody id="statement-rows"></tbody></table></div>
+            </div>
+
+            <div id="profile-setup-view">
+                <h3 class="modal-heading">Account Setup</h3>
+                <div class="auth-tabs">
+                    <div class="auth-tab active" onclick="switchTab('google')"><i class="fab fa-google"></i> Sign in with Google</div>
+                    <div class="auth-tab" onclick="switchTab('manual')"><i class="fas fa-user"></i> Manual Setup</div>
+                </div>
+
+                <div class="auth-panel active" id="tab-google">
+                    <p class="paragraph-small">Sign in with your Google account to sync your receipts and profile photo automatically.</p>
+                    <div id="g_id_onload" data-client_id="140939199464-qebi1pvbll1q8e4e861pckst38t8e7n3.apps.googleusercontent.com" data-callback="handleCredentialResponse" data-auto_prompt="false"></div>
+                    <div class="g_id_signin" data-type="standard"></div>
+                </div>
+
+                <div class="auth-panel" id="tab-manual">
+                    <p class="paragraph-small">Set up your profile manually and optionally upload a profile photo.</p>
+                    <div class="auth-photo-upload">
+                        <div class="profile-pic-circle" onclick="document.getElementById('pic-upload-setup').click()" title="Click to add photo">
+                            <img id="setup-avatar-img" src="" alt="Profile Photo">
+                            <i class="fas fa-user-circle" id="setup-avatar-icon"></i>
+                            <div class="pic-overlay"><i class="fas fa-camera"></i></div>
+                        </div>
+                        <label for="pic-upload-setup" class="visually-hidden">Upload profile photo</label>
+                        <input type="file" id="pic-upload-setup" accept="image/*" onchange="handleSetupPicUpload(event)" title="Upload profile photo" aria-label="Upload profile photo">
+                        <span class="pic-hint">Click to add a profile photo</span>
+                    </div>
+                    <form id="profileForm" onsubmit="saveManualProfile(event)">
+                        <label class="small-label" for="regName">Cashier / Owner Name</label>
+                        <input type="text" id="regName" placeholder="e.g. Yitbarek Zewde" title="Cashier or owner full name" required>
+                        <label class="small-label" for="regEmail">Shop Contact Email</label>
+                        <input type="email" id="regEmail" placeholder="name@example.com" title="Shop contact email address" required>
+                        <button type="submit" class="button-save-profile">Save Profile Details</button>
+                    </form>
+                    <hr class="section-divider">
+                    <p class="paragraph-small">Want a username &amp; password account instead?</p>
+                    <div class="flex-gap-10">
+                        <button type="button" class="btn-primary" onclick="window.location.href='register.html'"><i class="fas fa-user-plus"></i> Register</button>
+                        <button type="button" class="btn-secondary" onclick="window.location.href='login.html'"><i class="fas fa-right-to-bracket"></i> Login</button>
+                        <button type="button" class="btn-secondary" onclick="window.location.href='dashboard.html'"><i class="fas fa-gauge-high"></i> Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Views Modal -->
+    <div id="viewsModal" class="modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeViewsModal()">&times;</span>
+
+            <div id="view-statements" class="view-panel">
+                <h3 class="modal-heading">Statements</h3>
+                <div id="statementView"></div>
+            </div>
+
+            <div id="view-drafts" class="view-panel"><h3 class="modal-heading">Saved Drafts</h3><div id="draftView"></div></div>
+
+            <div id="view-profile" class="view-panel"><h3 class="modal-heading">Profile Details</h3><div id="profileView"></div></div>
+
+            <div id="view-downloads" class="view-panel"><h3 class="modal-heading">Downloaded Receipts</h3><div id="downloadView"></div></div>
+
+            <div id="view-savedReceipts" class="view-panel"><h3 class="modal-heading">Saved Receipts</h3><div id="savedReceiptView"></div></div>
+
+            <div id="view-customers" class="view-panel">
+                <h3 class="modal-heading">Manage Customers</h3>
+                <div class="flex-gap-10 mb-15">
+                    <input type="text" id="newCustomerName" placeholder="Enter customer name" class="flex-grow">
+                    <button onclick="addCustomerManual()" class="customer-add-btn"><i class="fas fa-plus"></i> Add Customer</button>
+                </div>
+                <div id="customersListView"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Image Modal -->
+    <div id="receiptImageModal" class="modal modal-extra-high">
+        <div class="modal-content modal-center" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="document.getElementById('receiptImageModal').style.display='none'">&times;</span>
+            <h4 class="modal-heading">Saved Receipt Snapshot</h4>
+            <img id="receiptImageView" class="receipt-image" src="" alt="Saved receipt snapshot" title="Saved receipt snapshot">
+            <div class="flex-gap-10 mt-10">
+                <button class="btn-share" onclick="downloadSavedImage()"><i class="fas fa-download"></i> Download Image</button>
+                <button class="btn-danger" onclick="document.getElementById('receiptImageModal').style.display='none'">Close View</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer History Modal -->
+    <div id="customerHistoryModal" class="modal modal-high" onclick="this.style.display='none'">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="document.getElementById('customerHistoryModal').style.display='none'">&times;</span>
+            <h3 id="customerHistoryName" class="modal-heading"></h3>
+            <div id="customerHistoryBalance" class="history-balance-box"></div>
+            <div class="modal-scroll">
+                <table class="statement-table">
+                    <thead><tr><th>Date</th><th>Store</th><th>Total</th><th>Paid</th><th>Deposit / Due</th><th>Receipt</th></tr></thead>
+                    <tbody id="customerHistoryRows"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction Receipt Detail Modal -->
+    <div id="transactionItemsModal" class="modal modal-higher" onclick="this.style.display='none'">
+        <div class="modal-content modal-small" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="document.getElementById('transactionItemsModal').style.display='none'">&times;</span>
+            <h4 class="modal-heading"><i class="fas fa-receipt action-icon-primary"></i> Receipt Details</h4>
+            <div id="transactionItemsContent" class="paragraph-small"></div>
+        </div>
+    </div>
+
+    <div id="bottom-sticky-elements" class="bottom-sticky bg-black">
+        <button class="home" onclick="window.location.href='Easy Receipt.html'"><i class="fas fa-home"></i> Home</button>
+           
+        <button class="receipt-history" onclick="window.location.href='receipt-history.html'"><i class="fas fa-history"></i> Receipt History</button>
+        <button class="share-print-download" onclick="window.location.href='share-print.html'"><i class="fas fa-share-alt"></i> Share/Print</button>
+    </div>
+    <script>
+        // ─── Constants & State ────────────────────────────────────────────────────────
+        const SERVICE_ID = "service_2kca2tm";
+        const TEMPLATE_ID = "template_bk6mitp";
+        const PUBLIC_KEY = "4SOcrHZJ1yHxQiXjQ";
+        const CLOUD_DB_URL = "https://script.google.com/macros/s/AKfycbw1K6bkpSjBnS8dGvc9aE5v69V-pU0KJaLujN-bsS1LIf39oCzOLrnAwi0tQ8KmMxUOgg/exec";
+
+        let cart = [];
+        let currentUser = null;
+        let savedStores = [];
+        let pendingSetupPic = null;
+        let successTimer = null;
+
+        if (window.emailjs) emailjs.init(PUBLIC_KEY);
+
+        // ─── Init ─────────────────────────────────────────────────────────────────────
+        window.onload = function () {
+            loadUserData();
+            initStoreManager();
+            loadDrafts();
+            renderCustomerSuggestions();
+            cart = [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }];
+            render();
+            document.querySelectorAll('input[type=text], input[type=number]').forEach(el => el.oninput = updateUI);
+            document.getElementById('emailForm').addEventListener('submit', handleEmailSubmit);
+            document.getElementById('viewsModal').addEventListener('click', closeViewsModal);
+            document.getElementById('receiptImageModal').addEventListener('click', function () { this.style.display = 'none'; });
+        };
+
+        // ─── Modal Helpers ────────────────────────────────────────────────────────────
+        function closeViewsModal() { document.getElementById('viewsModal').style.display = 'none'; }
+        function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; }
+        function openProfileModal() { openView('profile'); }
+
+        function openView(type) {
+            const modal = document.getElementById('viewsModal');
+            document.querySelectorAll('#viewsModal .view-panel').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + type).classList.add('active');
+
+            if (type === 'profile') {
+                const saved = getStoredProfile();
+                const profileView = document.getElementById('profileView');
+                if (saved && saved.name && saved.email) {
+                    profileView.innerHTML = `<div class="profile-profile-line"><p><b>Name:</b> ${saved.name}</p><p><b>Email:</b> ${saved.email}</p><p><b>Provider:</b> ${saved.provider || 'manual'}</p></div>`;
+                } else {
+                    profileView.innerHTML = `<p class="paragraph-small">No profile saved yet.</p>`;
+                }
+            }
+            if (type === 'statements') buildStatementRows();
+            if (type === 'drafts') loadDrafts();
+            if (type === 'downloads') renderDownloadedReceipts();
+            if (type === 'savedReceipts') renderSavedReceipts();
+            if (type === 'customers') renderCustomersList();
+            modal.style.display = 'flex';
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach((el, i) => el.classList.toggle('active', (i === 0 && tab === 'google') || (i === 1 && tab === 'manual')));
+            document.getElementById('tab-google').classList.toggle('active', tab === 'google');
+            document.getElementById('tab-manual').classList.toggle('active', tab === 'manual');
+        }
+
+        function handleMenuClick(actionType) { document.getElementById('dropdown').classList.remove('show'); openView(actionType); }
+
+        function toggleDropdown(e) {
+            e.stopPropagation();
+            document.getElementById('dropdown').classList.toggle('show');
+        }
+
+        document.addEventListener('click', function (e) {
+            const menuBtn = document.getElementById('menu-btn');
+            const dropdown = document.getElementById('dropdown');
+            if (menuBtn && dropdown && !menuBtn.contains(e.target)) dropdown.classList.remove('show');
+        });
+
+        // ─── User / Profile ───────────────────────────────────────────────────────────
+        function parseJwt(token) { try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return {}; } }
+        function getStoredProfile() { return JSON.parse(localStorage.getItem('p3_user_profile') || 'null'); }
+
+        function saveProfile(profileObj) {
+            currentUser = profileObj;
+            localStorage.setItem('p3_user_profile', JSON.stringify(profileObj));
+            document.getElementById('user-display-name').innerText = profileObj.name || 'Cashier';
+            applyAvatarEverywhere(profileObj.picture || null);
+        }
+
+        function loadUserData() {
+            const saved = getStoredProfile();
+            if (saved && saved.name && saved.email) saveProfile(saved);
+            else { currentUser = null; document.getElementById('user-display-name').innerText = "Guest Cashier"; applyAvatarEverywhere(null); }
+        }
+
+        function applyAvatarEverywhere(src) {
+            setAvatar('nav-avatar-img', 'nav-avatar-icon', src);
+            setAvatar('modal-avatar-img', 'modal-avatar-icon', src);
+            setAvatar('setup-avatar-img', 'setup-avatar-icon', src);
+        }
+
+        function setAvatar(imgId, iconId, src) {
+            const img = document.getElementById(imgId), icon = document.getElementById(iconId);
+            if (!img || !icon) return;
+            if (src) { img.src = src; img.classList.add('loaded'); icon.style.display = 'none'; }
+            else { img.src = ''; img.classList.remove('loaded'); icon.style.display = ''; }
+        }
+
+        function handleSetupPicUpload(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => { pendingSetupPic = ev.target.result; setAvatar('setup-avatar-img', 'setup-avatar-icon', pendingSetupPic); };
+            reader.readAsDataURL(file);
+        }
+
+        function handlePicUpload(e) {
+            const file = e.target.files[0]; if (!file || !currentUser) return;
+            const reader = new FileReader();
+            reader.onload = ev => { currentUser.picture = ev.target.result; localStorage.setItem('p3_user_profile', JSON.stringify(currentUser)); applyAvatarEverywhere(currentUser.picture); };
+            reader.readAsDataURL(file);
+        }
+
+        function saveUpdatedName() {
+            const newName = document.getElementById('edit-name-input').value.trim();
+            if (!newName || !currentUser) return;
+            currentUser.name = newName;
+            localStorage.setItem('p3_user_profile', JSON.stringify(currentUser));
+            document.getElementById('user-display-name').innerText = newName;
+            document.getElementById('prof-name').innerText = newName;
+            alert("Name updated!");
+        }
+
+        function logoutUser() {
+            if (!confirm("Are you sure you want to sign out?")) return;
+            localStorage.removeItem('p3_user_profile');
+            currentUser = null;
+            document.getElementById('user-display-name').innerText = "Guest Cashier";
+            applyAvatarEverywhere(null);
+            document.getElementById('viewsModal').style.display = 'none';
+            document.getElementById('profile-setup-view').style.display = 'block';
+            document.getElementById('profile-active-view').classList.add('hidden');
+            updateUI();
+        }
+
+        function handleCredentialResponse(response) {
+            const payload = parseJwt(response.credential);
+            if (!payload.email) return alert('Google sign-in failed.');
+            saveProfile({ name: payload.name || "Google User", email: payload.email, picture: payload.picture || null, provider: 'google' });
+            fetchCloudData(payload.email);
+            openView('profile');
+            updateUI();
+        }
+
+        function saveManualProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById('regName').value.trim(), email = document.getElementById('regEmail').value.trim();
+            if (!name || !email) return alert('Please fill in both name and email.');
+            saveProfile({ name, email, picture: pendingSetupPic || null, provider: 'manual' });
+            pendingSetupPic = null;
+            document.getElementById('profileForm').reset();
+            openView('profile');
+            updateUI();
+        }
+
+        // ─── Store Manager ────────────────────────────────────────────────────────────
+        function initStoreManager() {
+            const defaults = ["Tanala Mini Shop", "Easy Receipt", "My Supermarket"];
+            savedStores = JSON.parse(localStorage.getItem('p3_saved_stores') || JSON.stringify(defaults));
+            renderStoreSelect();
+        }
+
+        function renderStoreSelect() {
+            const select = document.getElementById('storeSelect');
+            select.innerHTML = savedStores.map(s => `<option value="${s}">${s}</option>`).join('') + `<option value="ADD_NEW">➕ Add New Store...</option>`;
+            updateUI();
+        }
+
+        function handleStoreChange() {
+            const select = document.getElementById('storeSelect');
+            if (select.value === "ADD_NEW") {
+                const name = prompt("Enter the name of your new store:");
+                if (name && name.trim()) {
+                    const clean = name.trim();
+                    if (!savedStores.includes(clean)) { savedStores.push(clean); localStorage.setItem('p3_saved_stores', JSON.stringify(savedStores)); }
+                    renderStoreSelect(); select.value = clean;
+                } else { renderStoreSelect(); }
+            }
+            updateUI();
+        }
+
+        // ─── Customer Manager ─────────────────────────────────────────────────────────
+        function getSavedCustomers() {
+            return JSON.parse(localStorage.getItem('p3_saved_customers') || '[]');
+        }
+
+        function setSavedCustomers(customers) {
+            localStorage.setItem('p3_saved_customers', JSON.stringify(customers));
+        }
+
+        function renderCustomerSuggestions() {
+            const datalist = document.getElementById('customerSuggestions');
+            if (!datalist) return;
+            const customers = getSavedCustomers();
+            datalist.innerHTML = customers.map(c => `<option value="${c.name}"></option>`).join('');
+        }
+
+        function addCustomerFromInput() {
+            const input = document.getElementById('client');
+            const name = input.value.trim();
+            if (!name) return alert("Please enter a customer name first.");
+            let customers = getSavedCustomers();
+            if (customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                return alert("This customer is already saved.");
+            }
+            customers.push({ id: Date.now(), name });
+            setSavedCustomers(customers);
+            renderCustomerSuggestions();
+            renderCustomersList();
+            alert("Customer added to your list!");
+        }
+
+        function addCustomerManual() {
+            const input = document.getElementById('newCustomerName');
+            const name = input.value.trim();
+            if (!name) return alert("Please enter a customer name.");
+            let customers = getSavedCustomers();
+            if (customers.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+                return alert("This customer already exists.");
+            }
+            customers.push({ id: Date.now(), name });
+            setSavedCustomers(customers);
+            input.value = '';
+            renderCustomersList();
+            renderCustomerSuggestions();
+        }
+
+        function renderCustomersList() {
+            const view = document.getElementById('customersListView');
+            if (!view) return;
+            const customers = getSavedCustomers();
+            view.innerHTML = customers.length
+                ? customers.map(c => `<div class="draft-item"><span class="customer-name" onclick="showCustomerHistory(${c.id})" title="View receipt history"><b>${c.name}</b> <i class="fas fa-chevron-right action-icon-dark"></i></span><div class="draft-actions"><i class="fas fa-check-circle action-icon-success" onclick="useCustomer('${c.name.replace(/'/g, "\\'")}')" title="Use this customer"></i><i class="fas fa-trash action-icon-danger" onclick="deleteCustomer(${c.id})" title="Delete"></i></div></div>`).join('')
+                : '<p class="paragraph-small">No customers saved yet. Add one above.</p>';
+        }
+
+        function useCustomer(name) {
+            document.getElementById('client').value = name;
+            updateUI();
+            closeViewsModal();
+        }
+
+        function deleteCustomer(id) {
+            let customers = getSavedCustomers();
+            customers = customers.filter(c => c.id !== id);
+            setSavedCustomers(customers);
+            renderCustomersList();
+            renderCustomerSuggestions();
+        }
+
+        // ─── Cart ─────────────────────────────────────────────────────────────────────
+        function importItems() {
+            const lines = document.getElementById('bulkData').value.split('\n');
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                const clean = line.trim(); let parts = clean.split(/\s+/), qty = 1;
+                if (parts.length > 1 && /^\d+$/.test(parts[parts.length - 1])) qty = parseInt(parts.pop());
+                cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: parts.join(' '), price: 0, qty });
+            });
+            document.getElementById('bulkData').value = ''; render();
+        }
+
+        // safe escape for inserted values
+        function escapeHtml(s) {
+            return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
+        function render() {
+            const list = document.getElementById('itemList');
+            list.innerHTML = cart.map(i => `
+                <div class="item-row">
+                    <input type="text" value="${escapeHtml(i.name)}" placeholder="Item name" aria-label="Item name" onchange="upd(${i.id},'name',this.value)">
+                    <input type="number" placeholder="Price (e.g. 12.50)" value="${escapeHtml(i.price)}" aria-label="Item price" oninput="upd(${i.id},'price',this.value)">
+                    <input type="number" class="qty-box" value="${escapeHtml(i.qty)}" placeholder="Qty" aria-label="Quantity" oninput="upd(${i.id},'qty',this.value)">
+                    <button class="inline-action-btn" title="Delete item" aria-label="Delete item" onclick="del(${i.id})"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
+                </div>`).join('');
+            updateUI();
+        }
+
+        function upd(id, f, v) {
+            let item = cart.find(x => x.id === id); if (!item) return;
+            if (f === 'price') item[f] = v === '' ? 0 : parseFloat(v);
+            else if (f === 'qty') item[f] = v === '' ? 1 : parseInt(v);
+            else item[f] = v;
+            updateUI();
+        }
+
+        function del(id) { cart = cart.filter(x => x.id !== id); render(); }
+        function addEmpty() { cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: "Item", price: 0, qty: 1 }); render(); }
+        function handleClearCart() { if (confirm("Clear all items?")) { cart = []; render(); } }
+
+        // ─── Receipt UI ───────────────────────────────────────────────────────────────
+        function updateUI() {
+            const receiptBox = document.getElementById('receipt-box'); if (!receiptBox) return;
+            let sub = cart.reduce((s, i) => s + (parseFloat(i.price || 0) * parseInt(i.qty || 1)), 0),
+                discountPct = parseFloat(document.getElementById('discount').value || 0) / 100,
+                discountAmt = sub * discountPct, subAfterDiscount = sub - discountAmt,
+                txVal = subAfterDiscount * (parseFloat(document.getElementById('tax').value || 0) / 100),
+                total = subAfterDiscount + txVal,
+                pd = parseFloat(document.getElementById('paid').value) || 0,
+                onlinePaid = parseFloat(document.getElementById('online').value) || 0,
+                totalPaid = pd + onlinePaid, change = totalPaid - total,
+                storeName = document.getElementById('storeSelect').value || "My Store";
+
+            document.getElementById('receipt-ui').innerHTML = `
+                <div class="receipt-ui-container">
+                    <h1 class="receipt-store-name">${storeName}</h1>
+                    <p class="receipt-date">${new Date().toLocaleString()}</p>
+                    <div class="receipt-divider"></div>
+                    <p class="receipt-client-line"><b>CLIENT:</b> ${document.getElementById('client').value || '-'}</p>
+                    <table class="receipt-table">
+                        <thead>
+                            <tr>
+                                <th class="left">ORDER ITEMS</th>
+                                <th class="center">QTY</th>
+                                <th class="right">EACH</th>
+                                <th class="right">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${cart.map(i => {
+                                const each = parseFloat(i.price || 0);
+                                const itotal = each * parseInt(i.qty || 1);
+                                return `<tr><td class="receipt-item-name left">${i.name}</td><td class="center">${i.qty}</td><td class="right">R ${each.toFixed(2)}</td><td class="right">R ${itotal.toFixed(2)}</td></tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    <div class="receipt-divider"></div>
+                    <div class="receipt-summary-row"><span>Subtotal</span><span>R ${sub.toFixed(2)}</span></div>
+                    ${discountAmt > 0 ? `<div class="receipt-summary-row discount"><span>Discount (${document.getElementById('discount').value}%)</span><span>-R ${discountAmt.toFixed(2)}</span></div>` : ''}
+                    ${txVal > 0 ? `<div class="receipt-summary-row"><span>Tax (${document.getElementById('tax').value}%)</span><span>R ${txVal.toFixed(2)}</span></div>` : ''}
+                    <div class="receipt-total-row"><span>TOTAL</span><span>R ${total.toFixed(2)}</span></div>
+                    ${totalPaid > 0 ? `
+                        <div class="receipt-payments">
+                            ${pd > 0 ? `<div class="receipt-payment-line"><span>Cash Paid</span><span>R ${pd.toFixed(2)}</span></div>` : ''}
+                            ${onlinePaid > 0 ? `<div class="receipt-payment-line"><span>Card/S2S Paid</span><span>R ${onlinePaid.toFixed(2)}</span></div>` : ''}
+                            <div class="receipt-change ${change >= 0 ? 'receipt-change-positive' : 'receipt-change-negative'}"><span>CHANGE</span><span>R ${change.toFixed(2)}</span></div>
+                            ${change < 0 ? `<div class="receipt-due">AMOUNT DUE: R ${Math.abs(change).toFixed(2)}</div>` : ''}
+                        </div>` : ''}
+                    <div class="receipt-qr-section"><div id="qr-place"></div></div>
+                    <p class="receipt-qr-note">SCAN TO VISIT OUR WEBSITE</p>
+                    <p class="receipt-footer">This receipt is prepared by <strong>${currentUser ? currentUser.name : "Easy Receipt"}</strong></p>
+                </div>`;
+
+            const qr = new QRious({ element: document.createElement('canvas'), value: 'https://easy-receipt-yitbarek.netlify.app/', size: 90 });
+            const qrContainer = document.getElementById('qr-place');
+            if (qrContainer) { qrContainer.innerHTML = ''; qrContainer.appendChild(qr.image); }
+        }
+
+        // ─── Print / Download / Share ─────────────────────────────────────────────────
+        function printReceipt() {
+            const box = document.getElementById('receipt-box'); if (!box) return;
+            const clone = box.cloneNode(true);
+            const canvas = document.querySelector('#qr-place canvas');
+            if (canvas) { const img = document.createElement('img'); img.src = canvas.toDataURL('image/png'); img.className = 'receipt-qr-img'; const qrPlace = clone.querySelector('#qr-place'); if (qrPlace) { qrPlace.innerHTML = ''; qrPlace.appendChild(img); } }
+            const pw = window.open('', '_blank');
+            pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt</title><base href="${location.href}"><link rel="stylesheet" href="styles.css"></head><body>${clone.innerHTML}</body></html>`);
+            pw.document.close(); pw.focus(); setTimeout(() => pw.print(), 500);
+        }
+
+        async function generateBlob() {
+            const canvas = await html2canvas(document.getElementById('receipt-box'), { scale: 3, backgroundColor: "#ffffff" });
+            return new Promise(r => canvas.toBlob(r, 'image/png'));
+        }
+
+        async function shareToWhatsApp() {
+            try {
+                const blob = await generateBlob();
+                const file = new File([blob], 'receipt.png', { type: 'image/png' });
+                if (navigator.share) await navigator.share({ files: [file], title: 'My Receipt' });
+                else alert("Sharing not supported on this browser.");
+            } catch (e) { alert("Sharing failed."); }
+        }
+
+        window.downloadReceipt = async function () {
+            try {
+                const blob = await generateBlob();
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'receipt.png'; a.click();
+            } catch (e) { alert("Download failed."); }
+        };
+
+        function saveReceipt() {
+            if (cart.length === 0) return alert("Cart is empty!");
+            generateBlob().then(blob => {
+                const reader = new FileReader();
+                reader.onloadend = function () {
+                    let snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]');
+                    snaps.push({ id: Date.now(), timestamp: new Date().toLocaleString(), store: document.getElementById('storeSelect').value, client: document.getElementById('client').value, paid: document.getElementById('paid').value, image: reader.result });
+                    localStorage.setItem('p3_pos_snapshots', JSON.stringify(snaps));
+                    buildStatementRows(); renderDownloadedReceipts(); renderSavedReceipts(); alert("Receipt Snap Saved!");
+                };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // ─── Drafts ───────────────────────────────────────────────────────────────────
+        function loadDrafts() {
+            const container = document.getElementById('draftsList'), view = document.getElementById('draftView');
+            const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            const html = drafts.length ? drafts.map(d => `<div class="draft-item"><span><b>${d.client || 'Guest'}</b> (${d.timestamp})</span><div class="draft-actions"><i class="fas fa-folder-open action-icon-primary" onclick="restoreDraft(${d.id})" title="Load"></i><i class="fas fa-trash action-icon-danger" onclick="deleteDraft(${d.id})" title="Delete"></i></div></div>`).join('') : '<p class="paragraph-small">No drafts available.</p>';
+            if (container) container.innerHTML = html;
+            if (view) view.innerHTML = html;
+        }
+
+        function saveCurrentDraft() {
+            if (cart.length === 0) return alert("Cart is empty!");
+            let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            drafts.push({ id: Date.now(), timestamp: new Date().toLocaleString(), store: document.getElementById('storeSelect').value, client: document.getElementById('client').value, tax: document.getElementById('tax').value, discount: document.getElementById('discount').value, paid: document.getElementById('paid').value, online: document.getElementById('online').value, cart: cart });
+            localStorage.setItem('p3_pos_drafts', JSON.stringify(drafts));
+            loadDrafts(); pushToCloud(); alert("Draft successfully preserved and synced!");
+        }
+
+        function restoreDraft(id) {
+            let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            let target = drafts.find(x => x.id === id); if (!target) return;
+            document.getElementById('storeSelect').value = target.store || savedStores[0];
+            document.getElementById('client').value = target.client || '';
+            document.getElementById('tax').value = target.tax || '0.00';
+            document.getElementById('discount').value = target.discount || '0.00';
+            document.getElementById('paid').value = target.paid || '';
+            document.getElementById('online').value = target.online || '';
+            if (target.cart) cart = target.cart; render();
+        }
+
+        function deleteDraft(id) {
+            let drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            drafts = drafts.filter(x => x.id !== id);
+            localStorage.setItem('p3_pos_drafts', JSON.stringify(drafts)); loadDrafts();
+        }
+
+        // ─── Statements & Saved Receipts ──────────────────────────────────────────────
+        function buildStatementRows() {
+            const tbody = document.getElementById('statement-rows'); if (!tbody) return;
+            const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            const snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]');
+            const rows = [...drafts.map(x => ({ ...x, type: 'draft' })), ...snaps.map(x => ({ ...x, type: 'snap' }))].sort((a, b) => (b.id || 0) - (a.id || 0));
+            if (!rows.length) { tbody.innerHTML = `<tr><td colspan="4" class="text-muted">No statement entries found.</td></tr>`; return; }
+            tbody.innerHTML = rows.map(d => {
+                let itemsReport = '', totalVal = 0;
+                if (d.cart && Array.isArray(d.cart)) {
+                    itemsReport = d.cart.map(i => `• ${i.name} (x${i.qty}) @ R${parseFloat(i.price || 0).toFixed(2)}`).join('<br>');
+                    const sub = d.cart.reduce((s, i) => s + (parseFloat(i.price || 0) * parseInt(i.qty || 1)), 0);
+                    const discAmt = sub * (parseFloat(d.discount || 0) / 100), afterDisc = sub - discAmt;
+                    totalVal = afterDisc + afterDisc * (parseFloat(d.tax || 0) / 100);
+                } else if (d.image) {
+                    itemsReport = `<button class="view-image-btn" onclick="viewSavedReceiptImage('${d.image.replace(/'/g, "\\'")}')"><i class="fas fa-image"></i> View Saved Snapshot</button>`;
+                    totalVal = parseFloat(d.paid || 0);
+                }
+                return `<tr><td class="nowrap">${d.timestamp || ''}</td><td><b>${d.client || 'N/A'}</b><br><small class="text-muted">Store: ${d.store || 'N/A'}</small></td><td class="paragraph-small" style="font-family:monospace;">${itemsReport}</td><td class="right" style="font-weight:bold;color:var(--dark);">R ${totalVal.toFixed(2)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderDownloadedReceipts() {
+            const view = document.getElementById('downloadView'), snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]');
+            view.innerHTML = snaps.length ? snaps.map(s => `<div class="draft-item"><span><b>${s.client || 'Guest'}</b> (${s.timestamp || ''})</span><div class="draft-actions"><button class="view-image-btn" onclick="viewSavedReceiptImage('${s.image.replace(/'/g, "\\'")}')" title="View"><i class="fas fa-image"></i></button><button class="view-image-btn" onclick="downloadBase64Image('${s.image.replace(/'/g, "\\'")}', 'receipt.png')" title="Download"><i class="fas fa-download"></i></button></div></div>`).join('') : '<p class="paragraph-small">No downloaded receipts found.</p>';
+        }
+
+        function renderSavedReceipts() {
+            const view = document.getElementById('savedReceiptView'), snaps = JSON.parse(localStorage.getItem('p3_pos_snapshots') || '[]');
+            view.innerHTML = snaps.length ? snaps.map(s => `<div class="draft-item"><span><b>${s.client || 'Guest'}</b> (${s.store || 'Store'})</span><div class="draft-actions"><button class="view-image-btn" onclick="viewSavedReceiptImage('${s.image.replace(/'/g, "\\'")}')" title="View"><i class="fas fa-image"></i></button></div></div>`).join('') : '<p class="paragraph-small">No saved receipts found.</p>';
+        }
+
+        function viewSavedReceiptImage(base64Data) { document.getElementById('receiptImageView').src = base64Data; document.getElementById('receiptImageModal').style.display = 'flex'; }
+        function downloadBase64Image(src, filename) { const a = document.createElement('a'); a.href = src; a.download = filename; a.click(); }
+        function downloadSavedImage() { downloadBase64Image(document.getElementById('receiptImageView').src, 'Saved_Receipt_Snapshot.png'); }
+        function openSnapshotsModal() { openView('savedReceipts'); }
+
+        // ─── Cloud Sync ───────────────────────────────────────────────────────────────
+        async function fetchCloudData(email) {
+            try {
+                const res = await fetch(`${CLOUD_DB_URL}?email=${encodeURIComponent(email)}`);
+                const data = await res.json();
+                if (data.drafts && data.drafts.length > 0) { localStorage.setItem('p3_pos_drafts', JSON.stringify(data.drafts)); loadDrafts(); buildStatementRows(); }
+            } catch (err) { console.error("Cloud fetch failed:", err); }
+        }
+
+        async function pushToCloud() {
+            if (!currentUser || !currentUser.email) return;
+            const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+            try { await fetch(CLOUD_DB_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: currentUser.email, drafts }) }); }
+            catch (err) { console.error("Cloud push failed:", err); }
+        }
+
+        // ─── Email / Support ──────────────────────────────────────────────────────────
+        async function handleEmailSubmit(e) {
+            e.preventDefault();
+            const btn = document.getElementById('sendButton'), status = document.getElementById('statusArea');
+            btn.innerHTML = "Sending..."; btn.disabled = true; status.innerHTML = "";
+            try {
+                const screenshotInput = document.getElementById('support-screenshot');
+                let screenshotBase64 = "";
+                if (screenshotInput.files && screenshotInput.files[0]) screenshotBase64 = await fileToBase64(screenshotInput.files[0]);
+                await emailjs.send(SERVICE_ID, TEMPLATE_ID, { from_name: currentUser?.name || 'Guest Cashier', from_email: document.getElementById('toEmail').value, subject: document.getElementById('subject').value, message: document.getElementById('message').value, user_email: document.getElementById('toEmail').value, screenshot: screenshotBase64, store_name: document.getElementById('storeSelect')?.value || '' });
+                status.innerHTML = "<span class='status-success'>✅ Email sent successfully!</span>";
+                clearTimeout(successTimer); successTimer = setTimeout(() => status.innerHTML = "", 3000);
+                document.getElementById('emailForm').reset();
+            } catch (err) { console.error(err); status.innerHTML = "<span class='status-error'>❌ Failed to send email.</span>"; }
+            finally { btn.innerHTML = "🚀 Send Email"; btn.disabled = false; }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+    </script>
+</body>
+</html>

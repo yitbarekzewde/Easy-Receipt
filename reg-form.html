@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(90deg, #0ace14, #cdfa04, #f72702, rgb(90, 172, 101));
+            background-size: 400% 400%;
+            animation: gradientAnimation 15s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            box-shadow: inset -10px 30px 60px rgba(39, 4, 240, 0.1);
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .left-navigation-arrow {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            cursor: pointer;
+            color: #cdfa06ef;
+        }
+
+        h1 {
+            color: #333;
+            font-weight: bold;
+        }
+
+        label {
+            display: flex;
+            margin-bottom: 2px;
+            color: #0c67cf;
+            font-weight: bold;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: large;
+        }
+
+        .login-form {
+            background: rgba(235, 238, 236, 0.9);
+            padding: 50px;
+            border-radius: 10px;
+            border-start-start-radius: 70px;
+            border-bottom-right-radius: 70px;
+            width: 320px;
+            text-align: center;
+            box-shadow: inset 0 0 100px rgba(7, 31, 243, 0.925);
+        }
+
+        .login-form h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .login-form input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .login-form button {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(90deg, #0ace14, #cdfa04, #f72702, rgb(30, 248, 40));
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 19px;
+            margin-top: 15px;
+        }
+
+        .login-form button:hover {
+            background: #5a6fd8;
+        }
+
+        .switch-link {
+            display: block;
+            margin-top: 15px;
+            color: #0c67cf;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .switch-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <i class="left-navigation-arrow" onclick="window.location.href='login.html'" title="Back to Login">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+    </i>
+
+    <div class="login-form">
+        <h1>Create Account</h1>
+        <h2>Register</h2>
+        <form id="reg-form" action="#" method="post">
+            <label for="username">User Name</label>
+            <input type="text" id="username" name="username" placeholder="Username" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="you@example.com" required>
+
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" placeholder="Password" required>
+
+            <label for="confirm_password">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+
+            <button type="submit">Create Account</button>
+        </form>
+        <a class="switch-link" onclick="window.location.href='login.html'">Already have an account? Login</a>
+    </div>
+
+    <script>
+        document.getElementById('reg-form').addEventListener('submit', function (event) {
+            event.preventDefault(); // Stop the form from refreshing the page
+
+            var username = document.getElementById('username').value.trim();
+            var email = document.getElementById('email').value.trim();
+            var password = document.getElementById('password').value;
+            var confirmPassword = document.getElementById('confirm_password').value;
+
+            // 1. Basic Validation
+            if (username === '' || email === '' || password === '') {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            // 2. Password Match Validation
+            if (password !== confirmPassword) {
+                alert('Passwords do not match!');
+                return;
+            }
+
+            // 3. Check for existing user (stored locally, same store login.html reads from)
+            var registeredUsers = JSON.parse(localStorage.getItem('registeredUsers')) || [];
+
+            var alreadyExists = registeredUsers.some(function (u) {
+                return u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase();
+            });
+
+            if (alreadyExists) {
+                alert('An account with that username or email already exists.');
+                return;
+            }
+
+            // 4. Save new account
+            var newUser = { username: username, email: email, password: password, createdAt: new Date().toISOString() };
+            registeredUsers.push(newUser);
+            localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
+
+            // 5. Log the activity for the admin dashboard
+            logActivity(username, 'Registered', 'New account created (' + email + ')');
+
+            alert('Account created successfully! Please log in.');
+            window.location.href = 'login.html';
+        });
+
+        function logActivity(username, action, detail) {
+            var log = JSON.parse(localStorage.getItem('activityLog')) || [];
+            log.push({ username: username, action: action, detail: detail || '', timestamp: new Date().toISOString() });
+            if (log.length > 1000) log = log.slice(log.length - 1000);
+            localStorage.setItem('activityLog', JSON.stringify(log));
+        }
+    </script>
+</body>
+</html>
