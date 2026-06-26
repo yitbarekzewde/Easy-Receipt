@@ -9,7 +9,7 @@
     "redirects": [
       {
         "source": "/",
-        "destination": "/Easy-Receipt.html",
+        "destination": "/index.html",
         "type": 301
       }
     ]
