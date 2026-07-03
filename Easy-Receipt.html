@@ -470,6 +470,23 @@
                     <li onclick="handleMenuClick('statements')">
                         <i class="fas fa-file-invoice-dollar" style="color:var(--primary);"></i> View Statements
                     </li>
+                    <div id="view-priceMgmt" class="view-panel">
+                <h3 class="modal-heading"><i class="fas fa-tags"></i> Price & Product Management</h3>
+                <p class="paragraph-small">Modify custom item base prices stored within your browser auto-complete index
+                    layout below:</p>
+                <div class="scrollable-x">
+                    <table class="price-mgmt-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Base Price (R)</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="price-management-rows"></tbody>
+                    </table>
+                </div>
+            </div>
                     <li onclick="handleMenuClick('profile')">
                         <i class="fas fa-save" style="color:var(--primary);"></i> Saved Drafts
                     </li>
@@ -1079,6 +1096,91 @@
             localStorage.setItem('p3_pos_drafts', JSON.stringify(drafts));
             loadDrafts();
         }
+
+
+        // ─── 4. AUTOMATIC STOCK PRICE AUTOFILL DICTIONARY INDEX ──────────────────────
+class InventoryPriceManager {
+    constructor() { this.pendingApprovals = []; }
+    getAutoPrices() { return JSON.parse(localStorage.getItem('p3_auto_prices') || '{}'); }
+    saveAutoPrices(pricesObj) { localStorage.setItem('p3_auto_prices', JSON.stringify(pricesObj)); this.renderPriceManagementTable(); }
+
+    lookupPrice(itemName) {
+        const lookup = itemName.trim().toLowerCase();
+        return this.getAutoPrices()[lookup] || null;
+    }
+    registerPossibleNewItem(itemName, price) {
+        if (!itemName.trim()) return;
+        const normalized = itemName.trim().toLowerCase();
+        const historicalPrice = this.getAutoPrices()[normalized];
+        if (historicalPrice === undefined) {
+            if (!this.pendingApprovals.some(x => x.name.toLowerCase() === normalized)) {
+                this.pendingApprovals.push({ name: itemName.trim(), price: parseFloat(price) || 0 });
+                this.renderApprovalInterface();
+            }
+        }
+    }
+    renderApprovalInterface() {
+        const box = document.getElementById('priceApprovalSection');
+        const container = document.getElementById('approvalItemsList');
+        if (this.pendingApprovals.length === 0) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        container.innerHTML = this.pendingApprovals.map((item, index) => `
+            <div class="approval-item">
+                <span>${item.name} (R ${item.price.toFixed(2)})</span>
+                <div>
+                    <button class="btn-primary" style="padding:2px 6px; font-size:11px;" onclick="inventoryPriceManager.approveSingle(${index})">Approve</button>
+                    <button class="btn-danger" style="padding:2px 6px; font-size:11px;" onclick="inventoryPriceManager.rejectSingle(${index})">Ignore</button>
+                </div>
+            </div>`).join('');
+    }
+    approveSingle(index) {
+        const target = this.pendingApprovals[index];
+        let current = this.getAutoPrices();
+        current[target.name.toLowerCase()] = { originalName: target.name, price: target.price };
+        this.saveAutoPrices(current);
+        this.pendingApprovals.splice(index, 1);
+        this.renderApprovalInterface();
+    }
+    rejectSingle(index) {
+        this.pendingApprovals.splice(index, 1);
+        this.renderApprovalInterface();
+    }
+    approveAllPending() {
+        let current = this.getAutoPrices();
+        this.pendingApprovals.forEach(target => {
+            current[target.name.toLowerCase()] = { originalName: target.name, price: target.price };
+        });
+        this.saveAutoPrices(current);
+        this.pendingApprovals = [];
+        this.renderApprovalInterface();
+    }
+    renderPriceManagementTable() {
+        const tbody = document.getElementById('price-management-rows');
+        if (!tbody) return;
+        const prices = this.getAutoPrices();
+        const keys = Object.keys(prices);
+        if (!keys.length) { tbody.innerHTML = `<tr><td colspan="3" class="text-muted text-center">No stored auto-fill prices found.</td></tr>`; return; }
+        tbody.innerHTML = keys.map(k => `
+            <tr>
+                <td><input type="text" value="${prices[k].originalName}" onchange="inventoryPriceManager.updateManagementKey('${k}', 'name', this.value)"></td>
+                <td><input type="number" step="0.01" value="${prices[k].price}" onchange="inventoryPriceManager.updateManagementKey('${k}', 'price', this.value)"></td>
+                <td><button class="btn-danger" style="padding: 2px 8px;" onclick="inventoryPriceManager.deleteManagementKey('${k}')"><i class="fas fa-trash"></i></button></td>
+            </tr>`).join('');
+    }
+    updateManagementKey(key, property, value) {
+        let prices = this.getAutoPrices();
+        if (!prices[key]) return;
+        if (property === 'name') prices[key].originalName = value;
+        if (property === 'price') prices[key].price = parseFloat(value) || 0;
+        this.saveAutoPrices(prices);
+    }
+    deleteManagementKey(key) {
+        let prices = this.getAutoPrices();
+        delete prices[key];
+        this.saveAutoPrices(prices);
+    }
+}
+
 
         /* ============================================================
            CART
