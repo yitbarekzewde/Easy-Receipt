@@ -243,3 +243,42 @@ button { padding: 14px; border-radius: 10px; border: none; font-weight: bold; cu
     color: #fa0b02;
     margin-top: 15px;
 }
+.bg-black {
+            background-color: black;
+        }
+
+        .approval-box {
+            background: #f9f9f9;
+            border: 1px dashed #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .approval-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            background: #fff;
+            padding: 5px;
+            border-radius: 3px;
+            border: 1px solid #eee;
+        }
+
+        .price-mgmt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .price-mgmt-table th,
+        .price-mgmt-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        .price-mgmt-table th {
+            background-color: #f4f4f4;
+        }
