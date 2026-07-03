@@ -756,6 +756,73 @@
         </div>
     </div>
 
+    //====================
+
+    <div id="viewsModal" class="modal">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <span class="close-modal" onclick="closeViewsModal()">&times;</span>
+
+            <div id="view-statements" class="view-panel">
+                <h3 class="modal-heading">Statements</h3>
+                <div id="statementView"></div>
+            </div>
+            <div id="view-drafts" class="view-panel">
+                <h3 class="modal-heading">Saved Drafts</h3>
+                <div id="draftView"></div>
+            </div>
+            <div id="view-profile" class="view-panel">
+                <h3 class="modal-heading">Profile Details</h3>
+                <div id="profileView"></div>
+            </div>
+            <div id="view-downloads" class="view-panel">
+                <h3 class="modal-heading">Downloaded Receipts</h3>
+                <div id="downloadView"></div>
+            </div>
+            <div id="view-savedReceipts" class="view-panel">
+                <h3 class="modal-heading">Saved Receipts</h3>
+                <div id="savedReceiptView"></div>
+            </div>
+
+            <div id="view-priceMgmt" class="view-panel">
+                <h3 class="modal-heading"><i class="fas fa-tags"></i> Price & Product Management</h3>
+                <p class="paragraph-small">Modify custom item base prices stored within your browser auto-complete index
+                    layout below:</p>
+                <div class="scrollable-x">
+                    <table class="price-mgmt-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Base Price (R)</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="price-management-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="view-customers" class="view-panel">
+                <h3 class="modal-heading">Manage Customers</h3>
+                <div class="flex-gap-10 mb-15">
+                    <input type="text" id="newCustomerName" placeholder="Enter customer name" class="flex-grow">
+                    <button onclick="customerManager.addCustomerManual()" class="customer-add-btn"><i
+                            class="fas fa-plus"></i> Add Customer</button>
+                </div>
+                <div id="customersListView">
+                    <div id="view-client-directory" class="view-panel">
+                        <h3 class="modal-heading"><i class="fas fa-users"></i> Client Accounts Directory Ledger</h3>
+                        <div class="flex-gap-10 mb-15">
+                            <input type="text" id="newCustomerProfileName" placeholder="Enter new customer profile name" class="flex-grow">
+                            <button onclick="customerManager.addCustomerManual()" class="customer-add-btn"><i class="fas fa-plus"></i> Add Profile</button>
+                        </div>
+                        <div id="customerDirectoryListView"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+//=================================
+
     <!-- Receipt snapshot viewer modal -->
     <div id="receiptImageModal" class="modal" style="z-index:1001;">
         <div class="modal-content" style="text-align:center;background:#f8fafc;max-width:450px;">
