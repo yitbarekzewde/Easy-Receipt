@@ -509,23 +509,8 @@
                     <li onclick="handleMenuClick('statements')">
                         <i class="fas fa-file-invoice-dollar" style="color:var(--primary);"></i> View Statements
                     </li>
-                    <div id="view-priceMgmt" class="view-panel">
-                <h3 class="modal-heading"><i class="fas fa-tags"></i> Price & Product Management</h3>
-                <p class="paragraph-small">Modify custom item base prices stored within your browser auto-complete index
-                    layout below:</p>
-                <div class="scrollable-x">
-                    <table class="price-mgmt-table">
-                        <thead>
-                            <tr>
-                                <th>Item Name</th>
-                                <th>Base Price (R)</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="price-management-rows"></tbody>
-                    </table>
-                </div>
-            </div>
+                     <li onclick="handleMenuClick('priceMgmt')"><i class="fas fa-tags icon-primary"></i> Price & Product
+                        Management</li>
                     <li onclick="handleMenuClick('profile')">
                         <i class="fas fa-save" style="color:var(--primary);"></i> Saved Drafts
                     </li>
@@ -559,8 +544,20 @@
     <div class="container">
         <div class="panel">
             <h2 style="color:var(--primary);margin-top:10px;text-transform:uppercase;">Stock Importer</h2>
+            <h4 class="paragraph-small">Paste your stock list below, one item per line, and click "Process & Add" to add them to the cart. 👇</h4>
             <textarea id="bulkData" placeholder="Huletts 1kg&#10;   500g&#10;Polony 2.5kg 1" rows="3"></textarea>
             <button class="btn-import" onclick="importItems()">Process & Add</button>
+
+            <div id="priceApprovalSection" class="approval-box hidden">
+                <h4>📌 New Items Pending Price System Approval</h4>
+                <p class="paragraph-small">The following items are new and require approval before they can be added to the cart. Please review and approve them.</p>
+                <h5 class="section-subheading"> when you approve the item it will be added to the cart and also saved in the price management system for future use of automatic price suggestions and fillings.</h5>
+                <div id="approvalItemsList"></div>
+                <div class="flex-gap-10 mt-10">
+                    <button class="btn-primary" style="padding: 4px 10px; font-size:12px;"
+                        onclick="inventoryPriceManager.approveAllPending()">Approve All</button>
+                </div>
+            </div>
 
             <div id="itemList" style="margin-top:20px;"></div>
             <button style="background:#cbd5e1;color:#1e293b;font-size:11px;" onclick="addEmpty()">+ Add Row Manually</button>
