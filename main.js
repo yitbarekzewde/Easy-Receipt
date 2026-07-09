@@ -612,3 +612,129 @@ function saveReceipt() {
     }).catch(function(e){ alert("Could not save receipt image: " + e.message); });
     }
         
+function closeViewsModal() {
+    // Automatically capture a draft backup if the cart has active rows before hiding the workspace view panel
+    if (window.cartManager && window.cartManager.cart && window.cartManager.cart.length > 0) {
+        const clientName = document.getElementById('client')?.value?.trim();
+        // Only trigger auto-draft preserve if a client name has been designated
+        if (clientName) {
+            cartManager.saveCurrentDraft();
+        }
+    }
+    document.getElementById('viewsModal').style.display = 'none';
+}
+
+function openView(type) {
+    // NEW: Auto-save active checkout matrix state on view switches before launching the target panel viewport
+    if (window.cartManager && window.cartManager.cart && window.cartManager.cart.length > 0) {
+        const clientName = document.getElementById('client')?.value?.trim();
+        if (clientName) {
+            // Silently invokes your existing draft function to update localStorage arrays
+            const originalAlert = window.alert; 
+            window.alert = function() {}; // Suppress the "Draft saved successfully!" alert popup during auto-saves
+            cartManager.saveCurrentDraft();
+            window.alert = originalAlert; // Restore alerts back to standard execution state
+        }
+    }
+
+    const modal = document.getElementById('viewsModal');
+    document.querySelectorAll('#viewsModal .view-panel').forEach(v => v.classList.remove('active'));
+    
+    const panel = document.getElementById('view-' + type);
+    if(panel) panel.classList.add('active');
+
+    // ... (rest of your existing openView logic remains completely untouched)
+    if (type === 'profile') 
+        // ...
+        // Safely serializes local records to disk if the application processes layout changes or window unloads
+        window.addEventListener('pagehide', function () {
+            if (window.cartManager && window.cartManager.cart && window.cartManager.cart.length > 0) {
+                const clientName = document.getElementById('client')?.value?.trim();
+                if (clientName) {
+                    // Saves current cart items to 'p3_pos_drafts' immediately before the browser session disconnects
+                    cartManager.saveCurrentDraft();
+                }
+            }
+        });
+    modal.style.display = 'flex';
+}
+// ─── AUTO-RESUME DETECTOR FOR RETURNING CUSTOMERS ───────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+    const clientInput = document.getElementById('client');
+    if (!clientInput) return;
+
+    // Listen for when a customer name is filled, selected from datalist, or loses focus
+    ['input', 'change', 'blur'].forEach(eventType => {
+        clientInput.addEventListener(eventType, () => {
+            const currentName = clientInput.value.trim();
+            if (!currentName) return;
+
+            // Fetch active drafts from storage directory
+            const drafts = JSON.parse(localStorage.getItem('p3_pos_drafts') || '[]');
+
+            // Find the most recent draft matching this customer (case-insensitive)
+            const matchingDraft = drafts.slice().reverse().find(d => d.client && d.client.toLowerCase() === currentName.toLowerCase());
+
+            // If a draft is found, and it's not already loaded in the active cart workspace
+            if (matchingDraft && (!window.cartManager.cart.length || window.cartManager.cart[0].name === 'Sample Product')) {
+                // Prevent duplicate popups if one is already visible on screen
+                if (document.getElementById('autoResumeModal')) return;
+
+                showResumePopup(matchingDraft);
+            }
+        });
+    });
+});
+
+// Structural popup generator (uses standard window overlay styles to keep design pristine)
+function showResumePopup(draft) {
+    const overlay = document.createElement('div');
+    overlay.id = 'autoResumeModal';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center;
+        align-items: center; z-index: 999999; backdrop-filter: blur(2px);
+    `;
+
+    // Map out item summary context strings for glance checking
+    const itemsSummary = d => d.cart ? d.cart.map(i => `${i.name} (x${i.qty})`).join(', ') : 'Empty Cart';
+
+    overlay.innerHTML = `
+        <div style="background: white; padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); font-family: sans-serif;">
+            <div style="text-align: center; margin-bottom: 16px;">
+                <i class="fas fa-clock-rotate-left" style="font-size: 32px; color: #f97316;"></i>
+            </div>
+            <h3 style="text-align: center; margin: 0 0 8px 0; color: #1e293b; font-size: 18px;">Pending Draft Detected</h3>
+            <p style="text-align: center; font-size: 13.5px; color: #64748b; margin: 0 0 16px 0;">
+                We found a saved transaction record for <b>${draft.client}</b> from ${draft.timestamp}.
+            </p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; font-size: 12.5px; color: #334155; max-height: 80px; overflow-y: auto; margin-bottom: 20px; font-family: monospace;">
+                <strong>Items:</strong> ${itemsSummary(draft)}
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button id="resumeDeclineBtn" style="flex: 1; padding: 10px; border-radius: 8px; background: #e2e8f0; color: #475569; font-weight: 600; border: none; cursor: pointer; font-size: 13.5px;">
+                    Start New
+                </button>
+                <button id="resumeConfirmBtn" style="flex: 1; padding: 10px; border-radius: 8px; background: #16a34a; color: white; font-weight: 600; border: none; cursor: pointer; font-size: 13.5px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="fas fa-play"></i> Continue
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Event Action Trigger: Continue Session Button
+    document.getElementById('resumeConfirmBtn').addEventListener('click', () => {
+        if (window.restoreDraft) {
+            window.restoreDraft(draft.id);
+        }
+        overlay.remove();
+    });
+
+    // Event Action Trigger: Decline / Start New Button
+    document.getElementById('resumeDeclineBtn').addEventListener('click', () => {
+        overlay.remove();
+    });
+}
