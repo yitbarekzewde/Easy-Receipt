@@ -76,6 +76,11 @@
             border-color: #007bff;
             outline: none;
         }
+        .password-field { position: relative; }
+        .password-field input { padding-right: 42px; }
+        .password-toggle { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 32px !important; height: 32px; margin: 0 !important; padding: 5px !important; background: transparent !important; color: #52606d !important; font-size: 16px !important; }
+        .password-toggle:hover { color: #007bff !important; }
+        .password-toggle svg { display: block; width: 20px; height: 20px; }
 
         .login-form button {
             width: 100%;
@@ -92,6 +97,32 @@
 
         .login-form button:hover {
             background: #5a6fd8;
+        }
+
+        .login-form button:disabled {
+            cursor: wait;
+            opacity: 0.85;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            vertical-align: -4px;
+            border: 3px solid #f72702;
+            border-top-color: #0ace14;
+            border-right-color: #cdfa04;
+            border-radius: 50%;
+            animation: tricolorSpin 0.8s linear infinite;
+        }
+
+        .login-form button.loading .loading-spinner {
+            display: inline-block;
+        }
+
+        @keyframes tricolorSpin {
+            to { transform: rotate(360deg); }
         }
 
         .switch-link {
@@ -128,24 +159,47 @@
             <input type="email" id="email" name="email" placeholder="you@example.com" required>
 
             <label for="password">Password</label>
-            <input type="password" id="password" name="password" placeholder="Password" required>
+            <div class="password-field">
+                <input type="password" id="password" name="password" placeholder="Password" required>
+                <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                </button>
+            </div>
 
             <label for="confirm_password">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+            <div class="password-field">
+                <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
+                <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                </button>
+            </div>
 
-            <button type="submit">Create Account</button>
+            <button type="submit"><span class="loading-spinner" aria-hidden="true"></span><span class="submit-label">Create Account</span></button>
         </form>
         <a class="switch-link" onclick="window.location.href='login.html'">Already have an account? Login</a>
     </div>
 
+    <script>
+        document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                const input = toggle.parentElement.querySelector('input');
+                const isVisible = input.type === 'text';
+                input.type = isVisible ? 'password' : 'text';
+                toggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
+                toggle.setAttribute('aria-pressed', String(!isVisible));
+            });
+        });
+    </script>
     <script type="module">
         import { auth } from './firebase-config.js';
         import { createUserWithEmailAndPassword, updateProfile, signOut } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';
 
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyVb8j-fB-fjiqGDYoObyaDk-J6f0jCv_zHXoZ080L0/dev';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvSKWrf9RYexa6nySHIQwr2JP-rtqk4k_vWCAJh6GumAPHnZEQLDosVpM7FbDxgq_KYw/exec';
+        let registrationInProgress = false;
 
         document.getElementById('reg-form').addEventListener('submit', function (event) {
             event.preventDefault(); // Stop the form from refreshing the page
+            if (registrationInProgress) return;
 
             var username = document.getElementById('username').value.trim();
             var email = document.getElementById('email').value.trim();
@@ -169,12 +223,17 @@
 
         async function createAccount(username, email, password) {
             var submitButton = document.querySelector('#reg-form button[type="submit"]');
+            registrationInProgress = true;
             submitButton.disabled = true;
+            submitButton.classList.add('loading');
+            submitButton.querySelector('.submit-label').textContent = 'Creating account...';
             try {
                 var credential = await createUserWithEmailAndPassword(auth, email, password);
                 await updateProfile(credential.user, { displayName: username });
                 var otpResult = await sendOTP(email);
-                if (!otpResult || !otpResult.success) throw new Error('Could not send verification code.');
+                if (!otpResult || !otpResult.success) {
+                    throw new Error(otpResult && otpResult.message ? otpResult.message : 'Could not send verification code.');
+                }
                 await signOut(auth);
                 localStorage.setItem('pendingVerificationEmail', email);
                 logActivity(username, 'Registered', 'Verification email sent to ' + email);
@@ -182,24 +241,35 @@
                 window.location.href = 'email-verification.html';
             } catch (error) {
                 alert(getAuthErrorMessage(error));
+                registrationInProgress = false;
                 submitButton.disabled = false;
+                submitButton.classList.remove('loading');
+                submitButton.querySelector('.submit-label').textContent = 'Create Account';
             }
         }
 
         async function sendOTP(email) {
-            var response = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'sendOTP', email: email })
-            });
-            return response.json();
+            var response;
+            try {
+                response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: 'sendOTP', email: email })
+                });
+            } catch (error) {
+                throw new Error('Could not reach the verification service. Please try again later.');
+            }
+            if (!response.ok) throw new Error('The verification service is unavailable. Please try again later.');
+            try { return await response.json(); }
+            catch (error) { throw new Error('The verification service returned an invalid response. Please try again later.'); }
         }
 
         function getAuthErrorMessage(error) {
             if (error.code === 'auth/email-already-in-use') return 'An account with that email already exists.';
             if (error.code === 'auth/weak-password') return 'Password must be at least 6 characters.';
             if (error.code === 'auth/invalid-email') return 'Please enter a valid email address.';
-            return 'Could not create the account. Please try again.';
+            if (error.message) return error.message;
+            return 'Could not create the account. Please try again later.';
         }
 
         function logActivity(username, action, detail) {

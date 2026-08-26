@@ -37,7 +37,7 @@
         <p><a href="login.html">Back to login</a></p>
     </main>
     <script>
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyVb8j-fB-fjiqGDYoObyaDk-J6f0jCv_zHXoZ080L0/dev';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyvSKWrf9RYexa6nySHIQwr2JP-rtqk4k_vWCAJh6GumAPHnZEQLDosVpM7FbDxgq_KYw/exec';
         const emailInput = document.getElementById('email');
         const otpInput = document.getElementById('otp');
         const status = document.getElementById('status');
@@ -80,7 +80,9 @@
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
             });
-            return response.json();
+            if (!response.ok) throw new Error('The verification service is unavailable. Please try again later.');
+            try { return await response.json(); }
+            catch (error) { throw new Error('The verification service returned an invalid response. Please try again later.'); }
         }
 
         function setBusy(isBusy) {

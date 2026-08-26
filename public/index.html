@@ -8,11 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="favicon.ico" type="image/r-icon">
-    <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-        <symbol id="icon-logo" viewBox="0 0 24 24">
-            <path d="M12 0C5.372 0 0 5.372 0 12s5.372 12 12 12 12-5.372 12-12S18.628 0 12 0zm0 22C6.486 22 2 17.514 2 12S6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z" />
-            <path d="M16.293 7.707a1 1 0 00-1.414-1.414L10.586 11l-2.293-2.293a1 1 0 00-1.414 1.414l3
-    <style>
         .site-logo {
   width: 150px; /* Adjust as needed */
   height: auto;
@@ -161,7 +156,7 @@
             </div>
 
             <div class="flex-gap-10 mt-20">
-                <button class="btn-share" onclick="openShareOptions()"><i class="fas fa-share-alt"></i> Share
+                <button class="btn-share" onclick="window.openShareOptions()"><i class="fas fa-share-alt"></i> Share
                     to WhatsApp</button>
                 <button class="btn-primary" onclick="window.printReceiptOnly()"><i class="fas fa-print"></i> Print
                     Receipt</button>
@@ -359,6 +354,15 @@
                 <h3 class="modal-heading">Saved Receipts</h3>
                 <div id="savedReceiptView"></div>
             </div>
+            <div id="view-ordering" class="view-panel">
+                <h3 class="modal-heading"><i class="fas fa-cart-plus"></i> Ordering</h3>
+                <div class="ordering-search">
+                    <input type="search" id="orderingSearchInput" placeholder="Search items" aria-label="Search ordering items">
+                    <button type="button" class="btn-primary" onclick="searchOrderingItems()"><i class="fas fa-search"></i> Search</button>
+                </div>
+                <div id="orderingItems" class="ordering-items"></div>
+                <button type="button" class="btn-save ordering-done-button" onclick="finishOrdering()"><i class="fas fa-check"></i> Done</button>
+            </div>
 
             <div id="view-priceMgmt" class="view-panel">
                 <h3 class="modal-heading"><i class="fas fa-tags"></i> Price & Product Management</h3>
@@ -380,6 +384,7 @@
 
             <div id="view-customers" class="view-panel">
                 <h3 class="modal-heading">Manage Customers</h3>
+                <div id="customerBalanceSummary" class="customer-balance-summary"></div>
                 <div class="flex-gap-10 mb-15">
                     <input type="text" id="newCustomerName" placeholder="Enter customer name" class="flex-grow">
                     <button onclick="customerManager.addCustomerManual()" class="customer-add-btn"><i
@@ -445,9 +450,9 @@
         <span>Receipts</span>
     </button>
 
-    <button class="bottom-nav-item" onclick="openView('statements')">
-        <i class="fas fa-history"></i>
-        <span>Histories</span>
+    <button class="bottom-nav-item" onclick="openView('ordering')">
+        <i class="fas fa-cart-plus"></i>
+        <span>Ordering</span>
     </button>
 
     <button class="bottom-nav-item" onclick="shareReceiptAction()">
@@ -486,6 +491,19 @@
         <p class="footer-text">© 2026 Easy Receipt. All rights reserved.</p>
     </footer>
     <script href="main.js" src="main.js"></script>
+    <script>
+        window.handleCredentialResponse = function (response) {
+            try {
+                const payload = JSON.parse(atob(response.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+                authManager.saveProfile({ name: payload.name || 'Google User', email: payload.email || '', picture: payload.picture || null, provider: 'google' });
+                document.getElementById('profile-setup-view').style.display = 'none';
+                document.getElementById('profile-active-view').classList.remove('hidden');
+                closeViewsModal();
+            } catch (error) {
+                alert('Google sign-in failed. Please try again.');
+            }
+        };
+    </script>
 </body>
 
 </html>

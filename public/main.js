@@ -280,6 +280,14 @@ class CustomerManager {
     renderCustomersList() {
         const view = document.getElementById('customersListView'); if (!view) return;
         const customers = this.getSavedCustomers();
+        const summary = document.getElementById('customerBalanceSummary');
+        if (summary) {
+            const totalDue = customers.reduce((total, customer) => total + Number(customer.due || 0), 0);
+            const totalDeposit = customers.reduce((total, customer) => total + Number(customer.deposit || 0), 0);
+            summary.innerHTML = `
+                <div class="balance-total" style="color:#dc2626;">Total Due<strong>R ${totalDue.toFixed(2)}</strong></div>
+                <div class="balance-total" style="color:#16a34a;">Total Deposits<strong>R ${totalDeposit.toFixed(2)}</strong></div>`;
+        }
         
         view.innerHTML = customers.length
             ? customers.map(c => {
@@ -341,10 +349,27 @@ class CustomerManager {
                         <span style="color:#dc2626; font-size:13px;"><b>Cumulative Balance Due:</b> R${parseFloat(c.due || 0).toFixed(2)}</span>
                         <span style="color:#16a34a; font-size:13px;"><b>Cumulative Total Saved Deposit:</b> R${parseFloat(c.deposit || 0).toFixed(2)}</span>
                     </div>
+                    <div class="customer-balance-controls">
+                        <div><label for="due-${c.id}">Due amount</label><input id="due-${c.id}" type="number" min="0" step="0.01" value="${Number(c.due || 0).toFixed(2)}"></div>
+                        <div><label for="deposit-${c.id}">Deposit amount</label><input id="deposit-${c.id}" type="number" min="0" step="0.01" value="${Number(c.deposit || 0).toFixed(2)}"></div>
+                        <button type="button" class="customer-add-btn" onclick="customerManager.updateBalance(${c.id})"><i class="fas fa-save"></i> Save Balance</button>
+                    </div>
                     ${historyHtml}
                 </div>`;
             }).join('')
             : '<p class="paragraph-small">No customer metrics compiled inside your app directory ledger database yet.</p>';
+    }
+    updateBalance(id) {
+        const customers = this.getSavedCustomers();
+        const customer = customers.find(item => item.id === id);
+        if (!customer) return;
+        const due = Number(document.getElementById(`due-${id}`).value);
+        const deposit = Number(document.getElementById(`deposit-${id}`).value);
+        if (!Number.isFinite(due) || !Number.isFinite(deposit) || due < 0 || deposit < 0) return alert('Enter valid balance amounts.');
+        customer.due = due;
+        customer.deposit = deposit;
+        this.setSavedCustomers(customers);
+        this.renderCustomersList();
     }
     useCustomer(name) { 
         const clientInput = document.getElementById('client');
@@ -399,18 +424,39 @@ class CustomerManager {
 
 
 // ─── 4. AUTOMATIC STOCK PRICE AUTOFILL DICTIONARY INDEX ──────────────────────
+function formatItemName(name) {
+    const cleanName = String(name || '').trim();
+    return cleanName ? cleanName.charAt(0).toUpperCase() + cleanName.slice(1) : '';
+}
+
 class InventoryPriceManager {
     constructor() { this.pendingApprovals = []; }
-    getAutoPrices() { return JSON.parse(localStorage.getItem('p3_auto_prices') || '{}'); }
+    getAutoPrices() {
+        const stored = JSON.parse(localStorage.getItem('p3_auto_prices') || '{}');
+        const prices = Object.fromEntries(Object.entries(stored).filter(([, item]) => item && Number(item.price) > 0));
+        if (Object.keys(prices).length !== Object.keys(stored).length) localStorage.setItem('p3_auto_prices', JSON.stringify(prices));
+        return prices;
+    }
     saveAutoPrices(pricesObj) { localStorage.setItem('p3_auto_prices', JSON.stringify(pricesObj)); this.renderPriceManagementTable(); }
 
     lookupPrice(itemName) {
         const lookup = itemName.trim().toLowerCase();
         return this.getAutoPrices()[lookup] || null;
     }
+    registerOrderingItem(itemName, price) {
+        const cleanName = itemName.trim();
+        const validPrice = Number(price);
+        if (!cleanName || !Number.isFinite(validPrice) || validPrice <= 0) return;
+        const prices = this.getAutoPrices();
+        const key = cleanName.toLowerCase();
+        if (prices[key]) return;
+        prices[key] = { originalName: formatItemName(cleanName), price: validPrice };
+        this.saveAutoPrices(prices);
+    }
     registerPossibleNewItem(itemName, price) {
-        if (!itemName.trim()) return;
+        if (!itemName.trim() || !Number.isFinite(Number(price)) || Number(price) <= 0) return;
         const normalized = itemName.trim().toLowerCase();
+        this.registerOrderingItem(itemName, price);
         const historicalPrice = this.getAutoPrices()[normalized];
         if (historicalPrice === undefined) {
             if (!this.pendingApprovals.some(x => x.name.toLowerCase() === normalized)) {
@@ -436,7 +482,7 @@ class InventoryPriceManager {
     approveSingle(index) {
         const target = this.pendingApprovals[index];
         let current = this.getAutoPrices();
-        current[target.name.toLowerCase()] = { originalName: target.name, price: target.price };
+        current[target.name.toLowerCase()] = { originalName: formatItemName(target.name), price: target.price };
         this.saveAutoPrices(current);
         this.pendingApprovals.splice(index, 1);
         this.renderApprovalInterface();
@@ -448,7 +494,7 @@ class InventoryPriceManager {
     approveAllPending() {
         let current = this.getAutoPrices();
         this.pendingApprovals.forEach(target => {
-            current[target.name.toLowerCase()] = { originalName: target.name, price: target.price };
+            current[target.name.toLowerCase()] = { originalName: formatItemName(target.name), price: target.price };
         });
         this.saveAutoPrices(current);
         this.pendingApprovals = [];
@@ -462,7 +508,7 @@ class InventoryPriceManager {
         if (!keys.length) { tbody.innerHTML = `<tr><td colspan="3" class="text-muted text-center">No stored auto-fill prices found.</td></tr>`; return; }
         tbody.innerHTML = keys.map(k => `
             <tr>
-                <td><input type="text" value="${prices[k].originalName}" onchange="inventoryPriceManager.updateManagementKey('${k}', 'name', this.value)"></td>
+                <td><input type="text" value="${cartManager.escapeHtml(formatItemName(prices[k].originalName))}" onchange="inventoryPriceManager.updateManagementKey('${k}', 'name', this.value)"></td>
                 <td><input type="number" min="0" step="1" value="${prices[k].price}" onchange="inventoryPriceManager.updateManagementKey('${k}', 'price', this.value)"></td>
                 <td><button class="btn-danger" style="padding: 2px 8px;" onclick="inventoryPriceManager.deleteManagementKey('${k}')"><i class="fas fa-trash"></i></button></td>
             </tr>`).join('');
@@ -470,7 +516,7 @@ class InventoryPriceManager {
     updateManagementKey(key, property, value) {
         let prices = this.getAutoPrices();
         if (!prices[key]) return;
-        if (property === 'name') prices[key].originalName = value;
+        if (property === 'name') prices[key].originalName = formatItemName(value);
         if (property === 'price') prices[key].price = Math.max(0, Math.floor(Number(value) || 0));
         this.saveAutoPrices(prices);
     }
@@ -484,6 +530,19 @@ class InventoryPriceManager {
 // ─── 5. CART & TRANSACTION SYSTEM SYSTEM CORE ────────────────────────────────
 class CartManager {
     constructor() { this.cart = []; }
+    persistCart() {
+        const savedCart = this.cart.filter(item => item.name !== 'Sample Product');
+        if (savedCart.length) localStorage.setItem('p3_active_cart', JSON.stringify(savedCart));
+        else localStorage.removeItem('p3_active_cart');
+    }
+    loadSavedCart() {
+        try {
+            const savedCart = JSON.parse(localStorage.getItem('p3_active_cart') || '[]');
+            this.cart = Array.isArray(savedCart) && savedCart.length ? savedCart : [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }];
+        } catch (error) {
+            this.cart = [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }];
+        }
+    }
     importItems() {
         const bulkInput = document.getElementById('bulkData');
         const status = document.getElementById('importStatus');
@@ -497,6 +556,7 @@ class CartManager {
             if (!nameConstruct) return;
             const match = inventoryPriceManager.lookupPrice(nameConstruct);
             const historicalPrice = match ? match.price : 0;
+            inventoryPriceManager.registerOrderingItem(nameConstruct, historicalPrice);
             pastedItems.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: nameConstruct, price: historicalPrice, qty });
         });
         if (!pastedItems.length) {
@@ -518,6 +578,7 @@ class CartManager {
 
     render() {
         const list = document.getElementById('itemList');
+        this.persistCart();
         list.innerHTML = this.cart.map(i => `
         <div class="item-row">
             <input type="text" value="${this.escapeHtml(i.name)}" placeholder="Item name" aria-label="Item name" onchange="cartManager.upd(${i.id},'name',this.value)">
@@ -587,7 +648,7 @@ class CartManager {
                     <tbody>
                         ${this.cart.map(i => {
                             const each = parseFloat(i.price || 0);
-                            return `<tr><td class="receipt-item-name left">${i.name}</td><td class="center">${i.qty}</td><td class="right">R ${each.toFixed(2)}</td><td class="right">R ${(each * i.qty).toFixed(2)}</td></tr>`;
+                            return `<tr><td class="receipt-item-name left">${formatItemName(i.name)}</td><td class="center">${i.qty}</td><td class="right">R ${each.toFixed(2)}</td><td class="right">R ${(each * i.qty).toFixed(2)}</td></tr>`;
                         }).join('')}
                     </tbody>
                 </table>
@@ -840,9 +901,16 @@ window.onload = function () {
     storeManager.initStoreManager();
     loadDrafts();
     customerManager.renderCustomerSuggestions();
-    cartManager.cart = [{ id: 1, name: 'Sample Product', price: 0, qty: 1 }];
+    cartManager.loadSavedCart();
     cartManager.render();
     setupNavigationControls();
+
+    window.addEventListener('beforeunload', event => {
+        if (!cartManager.cart.some(item => item.name !== 'Sample Product')) return;
+        cartManager.persistCart();
+        event.preventDefault();
+        event.returnValue = 'Your active cart will be kept. Are you sure you want to leave?';
+    });
 
     document.querySelectorAll('input[type=text], input[type=number]').forEach(el => el.oninput = () => cartManager.updateUI());
     document.getElementById('emailForm').addEventListener('submit', (e) => supportManager.handleEmailSubmit(e));
@@ -1106,11 +1174,54 @@ function openView(type) {
     if (type === 'savedReceipts') renderSavedReceipts();
     if (type === 'customers') customerManager.renderCustomersList();
     if (type === 'priceMgmt') inventoryPriceManager.renderPriceManagementTable();
+    if (type === 'ordering') renderOrderingItems();
     modal.style.display = 'flex';
 }
+
+function renderOrderingItems(searchTerm) {
+    const container = document.getElementById('orderingItems');
+    if (!container) return;
+    const query = (searchTerm ?? document.getElementById('orderingSearchInput')?.value ?? '').trim().toLowerCase();
+    const prices = inventoryPriceManager.getAutoPrices();
+    const items = Object.keys(prices)
+        .map(key => ({ key, ...prices[key] }))
+        .filter(item => !query || item.originalName.toLowerCase().includes(query))
+        .sort((first, second) => first.originalName.localeCompare(second.originalName));
+    if (!items.length) {
+        container.innerHTML = '<p class="text-muted">No ordering items found.</p>';
+        return;
+    }
+    container.innerHTML = items.map(item => `
+        <label class="ordering-item">
+            <input type="checkbox" value="${cartManager.escapeHtml(item.key)}">
+            <span>${cartManager.escapeHtml(formatItemName(item.originalName))}</span>
+            <span class="ordering-item-price">R ${Number(item.price || 0).toFixed(2)}</span>
+        </label>`).join('');
+}
+
+window.searchOrderingItems = function() {
+    renderOrderingItems();
+};
+
+window.finishOrdering = function() {
+    const prices = inventoryPriceManager.getAutoPrices();
+    const selected = Array.from(document.querySelectorAll('#orderingItems input[type="checkbox"]:checked'));
+    if (!selected.length) return alert('Select at least one item for the cart.');
+    selected.forEach(checkbox => {
+        const item = prices[checkbox.value];
+        if (!item) return;
+        const existing = cartManager.cart.find(cartItem => cartItem.name.toLowerCase() === item.originalName.toLowerCase());
+        if (existing) existing.qty += 1;
+        else cartManager.cart.push({ id: Math.floor(Date.now() + Math.random() * 1000), name: item.originalName, price: item.price || 0, qty: 1 });
+    });
+    cartManager.render();
+    closeViewsModal();
+};
 // ─── AUTO-RESUME DETECTOR FOR RETURNING CUSTOMERS ───────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+    const orderingSearchInput = document.getElementById('orderingSearchInput');
+    if (orderingSearchInput) orderingSearchInput.addEventListener('input', () => renderOrderingItems());
     const clientInput = document.getElementById('client');
     if (!clientInput) return;
 
@@ -1281,6 +1392,40 @@ window.shareReceiptAction = function() {
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
 };
 
+window.getReceiptShareText = function() {
+    if (!window.cartManager || cartManager.cart.length === 0) return '';
+    const totals = cartManager.calculateTotals();
+    const client = document.getElementById('client')?.value || 'Customer';
+    const store = document.getElementById('storeSelect')?.value || 'Easy Receipt';
+    const items = cartManager.cart.map(item => `${item.name} (x${item.qty}) - R ${(parseFloat(item.price || 0) * item.qty).toFixed(2)}`).join('\n');
+    const balance = totals.change >= 0 ? `CHANGE/DEPOSIT: R ${totals.change.toFixed(2)}` : `AMOUNT DUE: R ${Math.abs(totals.change).toFixed(2)}`;
+    return `${store} - Official Receipt\nDate: ${new Date().toLocaleString()}\nClient: ${client}\n---------------------------\n${items}\n---------------------------\nTOTAL BILL: R ${totals.total.toFixed(2)}\nPAID: R ${totals.totalPaid.toFixed(2)}\n${balance}`;
+};
+
+window.shareReceiptTelegram = function() {
+    window.open(`https://t.me/share/url?url=&text=${encodeURIComponent(getReceiptShareText())}`, '_blank');
+};
+
+window.shareReceiptNative = async function() {
+    const text = getReceiptShareText();
+    if (navigator.share) {
+        try { await navigator.share({ title: 'Receipt', text }); } catch (error) { if (error.name !== 'AbortError') console.error(error); }
+    } else {
+        await navigator.clipboard.writeText(text);
+        alert('Receipt text copied. You can paste it into IMO or another app.');
+    }
+};
+
+window.copyReceiptText = async function() {
+    await navigator.clipboard.writeText(getReceiptShareText());
+    alert('Receipt text copied to the clipboard.');
+};
+
+window.closeShareOptions = function() {
+    const modal = document.getElementById('shareOptionsModal');
+    if (modal) modal.remove();
+};
+
 window.openShareOptions = function() {
     if (!window.cartManager || window.cartManager.cart.length === 0) return alert('Cart is empty! Add items before sharing.');
     const existing = document.getElementById('shareOptionsModal');
@@ -1294,10 +1439,14 @@ window.openShareOptions = function() {
         <div class="flex-gap-10">
             <button class="btn-share" onclick="shareReceiptAction(); document.getElementById('shareOptionsModal').remove()"><i class="fab fa-whatsapp"></i> WhatsApp</button>
             <button class="btn-primary" onclick="openReceiptEmail(); document.getElementById('shareOptionsModal').remove()"><i class="fas fa-envelope"></i> Email</button>
+            <button class="btn-primary" onclick="shareReceiptTelegram(); document.getElementById('shareOptionsModal').remove()"><i class="fab fa-telegram"></i> Telegram</button>
+            <button class="btn-primary" onclick="shareReceiptNative(); document.getElementById('shareOptionsModal').remove()"><i class="fas fa-share-nodes"></i> Other Apps</button>
+            <button class="btn-secondary" onclick="copyReceiptText(); document.getElementById('shareOptionsModal').remove()"><i class="fas fa-copy"></i> Copy Text</button>
             <button class="btn-primary" onclick="window.downloadReceipt(); document.getElementById('shareOptionsModal').remove()"><i class="fas fa-download"></i> Download</button>
         </div>
     </div>`;
     document.body.appendChild(modal);
+    modal.style.display = 'flex';
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 };
 

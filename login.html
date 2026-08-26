@@ -85,6 +85,11 @@
             outline: none;
             top: auto;
         }
+        .password-field { position: relative; }
+        .password-field input { padding-right: 42px; }
+        .password-toggle { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 32px !important; height: 32px; margin: 0 !important; padding: 5px !important; background: transparent !important; color: #52606d !important; font-size: 16px !important; }
+        .password-toggle:hover { color: #007bff !important; }
+        .password-toggle svg { display: block; width: 20px; height: 20px; }
 
         .login-form button {
             width: 100%;
@@ -133,7 +138,12 @@
             <label for="username">Email</label>
             <input type="email" name="username" placeholder="you@example.com" required>
             <label for="password">Password </label>
-            <input type="password" name="password" placeholder="Password" required>
+            <div class="password-field">
+                <input type="password" name="password" placeholder="Password" required>
+                <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
+                </button>
+            </div>
             <button type="submit">Login</button>
         </form>
         <a class="switch-link" onclick="window.location.href='reg-form.html'">Don't have an account? Register</a>
@@ -141,6 +151,17 @@
     </div>
 
     
+    <script>
+        document.querySelectorAll('.password-toggle').forEach(function (toggle) {
+            toggle.addEventListener('click', function () {
+                const input = toggle.parentElement.querySelector('input');
+                const isVisible = input.type === 'text';
+                input.type = isVisible ? 'password' : 'text';
+                toggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
+                toggle.setAttribute('aria-pressed', String(!isVisible));
+            });
+        });
+    </script>
     <script type="module">
         import { auth } from './firebase-config.js';
         import { signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js';

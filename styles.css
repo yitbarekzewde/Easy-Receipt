@@ -421,3 +421,99 @@ body {
 .bottom-nav-item:active {
     transform: scale(0.95);
 }
+
+.customer-balance-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.customer-balance-summary .balance-total {
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+
+.customer-balance-summary .balance-total strong {
+    display: block;
+    font-size: 18px;
+    margin-top: 4px;
+}
+
+.customer-balance-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    align-items: end;
+    margin-top: 10px;
+}
+
+.customer-balance-controls label {
+    display: block;
+    color: #64748b;
+    font-size: 11px;
+    margin-bottom: 4px;
+}
+
+.customer-balance-controls input {
+    margin: 0;
+    padding: 8px;
+}
+
+.customer-balance-controls button {
+    width: auto;
+    margin: 0;
+    padding: 9px 12px;
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .customer-balance-controls { grid-template-columns: 1fr 1fr; }
+    .customer-balance-controls button { grid-column: 1 / -1; }
+}
+.ordering-search {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.ordering-search input {
+    flex: 1;
+    margin-bottom: 0;
+}
+.ordering-search button,
+.ordering-done-button {
+    width: auto;
+    margin: 0;
+    white-space: nowrap;
+}
+.ordering-items {
+    display: grid;
+    gap: 6px;
+    max-height: 52vh;
+    overflow-y: auto;
+}
+.ordering-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    color: var(--dark);
+}
+.ordering-item input {
+    width: auto;
+    margin: 0;
+}
+.ordering-item-price {
+    margin-left: auto;
+    color: #64748b;
+    font-size: 12px;
+}
+.ordering-done-button {
+    margin-top: 14px;
+}
